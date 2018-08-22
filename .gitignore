@@ -23,7 +23,7 @@ parts/
 sdist/
 var/
 wheels/
-*.egg-info/
+*.egg-client_receiver/
 .installed.cfg
 *.egg
 MANIFEST
