@@ -71,6 +71,7 @@ function onClose(event) {
 
 function onMessage(event) {
     var msg = msgpack.decode(new Uint8Array(event.data));
+    console.log('onMessage');
     console.log(msg);
 }
 
