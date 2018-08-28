@@ -97,7 +97,9 @@ btn_start_other.addEventListener("click", function () {
 });
 
 btn_hangup.addEventListener("click", function () {
-    hangup();
+    console.log('Hanging up.');
+    stop();
+    sendMessage('bye');
 });
 
 function start(){
@@ -150,7 +152,9 @@ function onMessage(event) {
         });
         pc.addIceCandidate(candidate);
     } else if (message === 'bye' && isStarted) {
-        handleRemoteHangup();
+        console.log('Session terminated.');
+        stop();
+        isInitiator = false;
     }
 }
 
@@ -269,19 +273,6 @@ function requestTurn(turnURL) {
     }
 }
 
-
-
-function hangup() {
-    console.log('Hanging up.');
-    stop();
-    sendMessage('bye');
-}
-
-function handleRemoteHangup() {
-    console.log('Session terminated.');
-    stop();
-    isInitiator = false;
-}
 
 function stop() {
     isStarted = false;
