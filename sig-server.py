@@ -33,7 +33,7 @@ async def forward(websocket, path):
         msg_raw = await websocket.recv()
         msg = msgpack.unpackb(msg_raw)
         for other_socket in CLIENTS.difference([websocket]):
-            logging.debug (f'other socket {other_socket.remote_address}')
+            logging.debug(f"FROM {websocket.remote_address} TO {other_socket.remote_address} unpacked:{msg}")
             await other_socket.send(msg_raw)
 
 # Logging
