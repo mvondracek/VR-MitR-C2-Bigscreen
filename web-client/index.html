@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <style>
+body {
+  font-family: sans-serif;
+}
+
+video {
+  max-width: 100%;
+  width: 320px;
+}
+    </style>
+</head>
+<body>
+    <button id="btn_start_initiator">btn_start_initiator</button>
+    <button id="btn_start_other">btn_start_other</button>
+    <hr/>
+    <button id="btn_socket_connect">connect</button>
+    <button id="btn_socket_close">close</button>
+    <button id="btn_hangup">btn_hangup</button>
+
+    <div id="videos">
+        <video id="localVideo" autoplay muted playsinline></video>
+        <video id="remoteVideo" autoplay playsinline></video>
+    </div>
+
+<!-- This file is automatically added/served when running "node index.js". -->
+<script src="./adapter-latest.js"></script>
+<script src="./msgpack.min.js"></script>
+<script>
+'use strict';
+let isInitiator = false;
+let isStarted = false;
+let localStream;
+let pc;
+let remoteStream;
+let turnReady;
+
+const pcConfig = {
+    'iceServers': [{
+        'urls': 'stun:stun.l.google.com:19302'
+    }]
+};
+
+/////////////////////////////////////////////
+const wsUri = "ws://172.26.104.1:8090/";
+let websocket;
+
+
+<!--region GUI bindings -->
+const localVideo = document.querySelector('#localVideo');
+const remoteVideo = document.querySelector('#remoteVideo');
+
+const btn_socket_close = document.getElementById('btn_socket_close');
+const btn_socket_connect = document.getElementById('btn_socket_connect');
+const btn_hangup = document.getElementById('btn_hangup');
+const btn_start_initiator = document.getElementById('btn_start_initiator');
+const btn_start_other = document.getElementById('btn_start_other');
+<!--endregion-->
+
+function connect() {
+    websocket = new WebSocket(wsUri);
+    websocket.binaryType = 'arraybuffer';
+    websocket.onopen = function (event) {
+        console.log('onOpen connected');
+    };
+    websocket.onclose = function (event) {
+        console.log('onClose disconnected');
+    };
+    websocket.onmessage = function (event) {
+        onMessage(event);
+    };
+    websocket.onerror = function (event) {
+        console.log('onError event', event);
+    };
+
+    btn_socket_close.addEventListener("click", function () {
+        websocket.close();
+    });
+}
+
+btn_socket_connect.addEventListener("click", function () {
+    connect()
+});
+
+btn_start_initiator.addEventListener("click", function () {
+    connect();
+    isInitiator = true;
+    start();
+});
+
+btn_start_other.addEventListener("click", function () {
+    connect();
+    start();
+});
+
+btn_hangup.addEventListener("click", function () {
+    hangup();
+});
+
+function start(){
+    navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: true
+    })
+        .then(gotStream)
+        .catch(function (e) {
+            alert('getUserMedia() error: ' + e.name);
+        });
+}
+
+function gotStream(stream) {
+    console.log('Adding local stream.');
+    localStream = stream;
+    localVideo.srcObject = stream;
+    sendMessage('got user media');
+    if (isInitiator) {
+        maybeStart();
+    }
+}
+
+
+////////////////////////////////////////////////
+
+function sendMessage(message) {
+    console.log('Client sending message: ', message);
+    websocket.send(msgpack.encode(message));
+}
+
+// This client receives a message
+function onMessage(event) {
+    let message = msgpack.decode(new Uint8Array(event.data));
+    console.log('Client received message:', message);
+    if (message === 'got user media') {
+        maybeStart();
+    } else if (message.type === 'offer') {
+        if (!isInitiator && !isStarted) {
+            maybeStart();
+        }
+        pc.setRemoteDescription(new RTCSessionDescription(message));
+        doAnswer();
+    } else if (message.type === 'answer' && isStarted) {
+        pc.setRemoteDescription(new RTCSessionDescription(message));
+    } else if (message.type === 'candidate' && isStarted) {
+        let candidate = new RTCIceCandidate({
+            sdpMLineIndex: message.label,
+            candidate: message.candidate
+        });
+        pc.addIceCandidate(candidate);
+    } else if (message === 'bye' && isStarted) {
+        handleRemoteHangup();
+    }
+}
+
+////////////////////////////////////////////////////
+
+
+
+
+
+
+
+
+if (location.hostname !== 'localhost') {
+    requestTurn(
+        'https://computeengineondemand.appspot.com/turn?username=41784574&key=4080218913'
+    );
+}
+
+function maybeStart() {
+    if (!isStarted && typeof localStream !== 'undefined') {
+        try {
+            pc = new RTCPeerConnection(null);
+            pc.onicecandidate = function (event) {
+                console.log('icecandidate event: ', event);
+                if (event.candidate) {
+                    sendMessage({
+                        type: 'candidate',
+                        label: event.candidate.sdpMLineIndex,
+                        id: event.candidate.sdpMid,
+                        candidate: event.candidate.candidate
+                    });
+                } else {
+                    console.log('End of candidates.');
+                }
+            };
+            pc.ontrack  = function (event) {
+                console.log('Remote streams added.');
+                console.log(event.streams);
+                remoteStream = event.streams[0];
+                remoteVideo.srcObject = remoteStream;
+            };
+            pc.onremovestream = function (event) {
+                console.log('Remote stream removed. Event: ', event);
+            };
+
+            console.log('Created RTCPeerConnnection');
+        } catch (e) {
+            console.log('Failed to create PeerConnection, exception: ' + e.message);
+            alert('Cannot create RTCPeerConnection object.');
+            return;
+        }
+
+        pc.addStream(localStream);
+        isStarted = true;
+        console.log('isInitiator', isInitiator);
+        if (isInitiator) {
+            console.log('Sending offer to peer');
+            pc.createOffer(setLocalAndSendMessage, handleCreateOfferError);
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////
+
+
+
+
+function handleCreateOfferError(event) {
+    console.log('createOffer() error: ', event);
+}
+
+function doAnswer() {
+    console.log('Sending answer to peer.');
+    pc.createAnswer().then(
+        setLocalAndSendMessage,
+        onCreateSessionDescriptionError
+    );
+}
+
+function setLocalAndSendMessage(sessionDescription) {
+    pc.setLocalDescription(sessionDescription);
+    console.log('setLocalAndSendMessage sending message', sessionDescription);
+    sendMessage(sessionDescription);
+}
+
+function onCreateSessionDescriptionError(error) {
+    console.log('Failed to create session description: ' + error.toString());
+}
+
+function requestTurn(turnURL) {
+    let turnExists = false;
+    for (var i in pcConfig.iceServers) {
+        if (pcConfig.iceServers[i].urls.substr(0, 5) === 'turn:') {
+            turnExists = true;
+            turnReady = true;
+            break;
+        }
+    }
+    if (!turnExists) {
+        console.log('Getting TURN server from ', turnURL);
+        // No TURN server. Get one from computeengineondemand.appspot.com:
+        let xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4 && xhr.status === 200) {
+                let turnServer = JSON.parse(xhr.responseText);
+                console.log('Got TURN server: ', turnServer);
+                pcConfig.iceServers.push({
+                    'urls': 'turn:' + turnServer.username + '@' + turnServer.turn,
+                    'credential': turnServer.password
+                });
+                turnReady = true;
+            }
+        };
+        xhr.open('GET', turnURL, true);
+        xhr.send();
+    }
+}
+
+
+
+function hangup() {
+    console.log('Hanging up.');
+    stop();
+    sendMessage('bye');
+}
+
+function handleRemoteHangup() {
+    console.log('Session terminated.');
+    stop();
+    isInitiator = false;
+}
+
+function stop() {
+    isStarted = false;
+    pc.close();
+    pc = null;
+}
+</script>
+</body>
+</html>
