@@ -104,7 +104,7 @@ btn_hangup.addEventListener("click", function () {
 
 function start(){
     navigator.mediaDevices.getUserMedia({
-        audio: false,
+        audio: true,
         video: true
     })
         .then(gotStream)
