@@ -23,7 +23,8 @@ video {
 
     <div id="videos">
         <video id="localVideo" autoplay muted playsinline></video>
-        <video id="remoteVideo" autoplay playsinline></video>
+        <video id="remoteVideoBigscreen" autoplay playsinline></video>
+        <video id="remoteVideoClient" autoplay playsinline></video>
     </div>
 
 <!-- This file is automatically added/served when running "node index.js". -->
@@ -35,7 +36,8 @@ let isInitiator = false;
 let isStarted = false;
 let localStream;
 let pc;
-let remoteStream;
+let remoteStreamBigscreen;
+let remoteStreamClient;
 let turnReady;
 
 const pcConfig = {
@@ -46,12 +48,15 @@ const pcConfig = {
 
 /////////////////////////////////////////////
 const wsUri = "ws://172.26.104.1:8090/";
+const bigscreenSignalUrl = 'wss://signal2.bigscreenvr.com';
 let websocket;
+let websocketBigscreen;
 
 
 <!--region GUI bindings -->
 const localVideo = document.querySelector('#localVideo');
-const remoteVideo = document.querySelector('#remoteVideo');
+const remoteVideoBigscreen = document.querySelector('#remoteVideoBigscreen');
+const remoteVideoClient = document.querySelector('#remoteVideoClient');
 
 const btn_socket_close = document.getElementById('btn_socket_close');
 const btn_socket_connect = document.getElementById('btn_socket_connect');
@@ -81,21 +86,39 @@ function connect() {
     });
 }
 
+function connect2Bigscreen() {
+    websocketBigscreen = new WebSocket(bigscreenSignalUrl);
+    websocketBigscreen.binaryType = 'arraybuffer';
+    websocketBigscreen.onopen = function (event) {
+        console.log('websocketBigscreen.onOpen');
+    };
+    websocketBigscreen.onclose = function (event) {
+        console.log('websocketBigscreen.onClose');
+    };
+    websocketBigscreen.onmessage = function (event) {
+        onMessageBigscreen(event);
+    };
+    websocketBigscreen.onerror = function (event) {
+        console.log('websocketBigscreen.onError', event);
+    };
+
+    btn_socket_close.addEventListener("click", function () {
+        websocketBigscreen.close();
+    });
+}
+
 btn_socket_connect.addEventListener("click", function () {
     connect()
 });
-
 btn_start_initiator.addEventListener("click", function () {
     connect();
     isInitiator = true;
     start();
 });
-
 btn_start_other.addEventListener("click", function () {
     connect();
     start();
 });
-
 btn_hangup.addEventListener("click", function () {
     console.log('Hanging up.');
     stop();
@@ -123,18 +146,76 @@ function gotStream(stream) {
     }
 }
 
-
 ////////////////////////////////////////////////
 
 function sendMessage(message) {
-    console.log('Client sending message: ', message);
+    console.log('MITM -> Client ', message);
     websocket.send(msgpack.encode(message));
+}
+
+function sendMessageBigscreen(message) {
+    console.log('MITM -> Bigscreen', message);
+    websocketBigscreen.send(msgpack.encode(message));
+}
+
+function onMessageBigscreen(event){
+    let message = msgpack.decode(new Uint8Array(event.data));
+    console.log('Bigscreen -> MITM', message);
+
+    // server to client forwarding rules
+    switch (message.type) {
+        case 'room-latest':
+        case 'room-created':
+        case 'user-joined':
+        case 'admin':
+        case 'user-ready':
+        case 'user-left':
+        case 'ice': // TODO: intercept
+        case 'offer': // TODO: intercept
+        case 'answer': // TODO: intercept
+            // forward to the client
+            sendMessage(message);
+            break;
+        default:
+            console.log('Unexpected message type (server to client):', message);
+            break;
+    }
+}
+
+function setLocalAndSendMessageBigscreen(sessionDescription) {
+    pc.setLocalDescription(sessionDescription);
+    console.log('setLocalAndSendMessage sending message', sessionDescription);
+    sendMessageBigscreen(sessionDescription); // TODO edit to match bigscreens format
 }
 
 // This client receives a message
 function onMessage(event) {
     let message = msgpack.decode(new Uint8Array(event.data));
-    console.log('Client received message:', message);
+    console.log('Client -> MITM', message);
+
+    // client to server forwarding rules
+    switch (message.type) {
+        case 'room-latest':
+        case 'register-desktop':
+        case 'room-create':
+        case 'room-join':
+        case 'admin':
+        case 'user-seat':
+        case 'user-ready':
+        case 'room-leave':
+        case 'offer': // TODO: intercept
+        case 'answer': // TODO: intercept
+        case 'ice': // TODO: intercept
+            // forward to the server
+            sendMessageBigscreen(message);
+            break;
+        default:
+            console.log('Unexpected message type (client to server):', message);
+            break;
+    }
+/*
+
+
     if (message === 'got user media') {
         maybeStart();
     } else if (message.type === 'offer') {
@@ -156,6 +237,7 @@ function onMessage(event) {
         stop();
         isInitiator = false;
     }
+*/
 }
 
 ////////////////////////////////////////////////////
@@ -193,8 +275,8 @@ function maybeStart() {
             pc.ontrack  = function (event) {
                 console.log('Remote streams added.');
                 console.log(event.streams);
-                remoteStream = event.streams[0];
-                remoteVideo.srcObject = remoteStream;
+                remoteStreamBigscreen = event.streams[0];
+                remoteVideoBigscreen.srcObject = remoteStreamBigscreen;
             };
             pc.onremovestream = function (event) {
                 console.log('Remote stream removed. Event: ', event);
