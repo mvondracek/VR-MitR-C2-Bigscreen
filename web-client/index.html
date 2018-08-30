@@ -40,6 +40,8 @@ let remoteStreamBigscreen;
 let remoteStreamClient;
 let turnReady;
 
+let sendDataChannel, receiveDataChannel;
+
 const pcConfig = {
     'iceServers': [{
         'urls': 'stun:stun.l.google.com:19302'
@@ -128,7 +130,7 @@ btn_hangup.addEventListener("click", function () {
 
 function start(){
     navigator.mediaDevices.getUserMedia({
-        audio: false,
+        audio: true,
         video: true
     })
         .then(gotStream)
@@ -227,10 +229,10 @@ function onMessage(event) {
         doAnswer();
     } else if (message.type === 'answer' && isStarted) {
         pc.setRemoteDescription(new RTCSessionDescription(message));
-    } else if (message.type === 'candidate' && isStarted) {
+    } else if (message.type === 'ice' && isStarted) {
         let candidate = new RTCIceCandidate({
             sdpMLineIndex: message.label,
-            candidate: message.candidate
+            candidate: message.value
         });
         pc.addIceCandidate(candidate);
     } else if (message === 'bye' && isStarted) {
@@ -264,10 +266,17 @@ function maybeStart() {
                 console.log('icecandidate event: ', event);
                 if (event.candidate) {
                     sendMessage({
-                        type: 'candidate',
-                        label: event.candidate.sdpMLineIndex,
-                        id: event.candidate.sdpMid,
-                        candidate: event.candidate.candidate
+                        type: 'ice',
+                        roomId: 'room-tycm6b8o', // TODO: dynamically set from messages
+                        label: event.candidate.sdpMLineIndex, // TODO old
+                        id: event.candidate.sdpMid, // TODO old
+                        value: event.candidate.candidate,
+                        fromDevice: 'desktop',
+                        targetDevice: 'desktop',
+                        fromUser: "user1",// TODO: dynamically set from messages
+                        targetUser: "user2",// TODO: dynamically set from messages
+                        SCID: "574d4a4b-42f0-c3cf-0921-9d8215f830e5",// TODO: dynamically set from messages
+                        PCID: 0 ,// TODO: dynamically set from messages
                     });
                 } else {
                     console.log('End of candidates.');
@@ -289,6 +298,22 @@ function maybeStart() {
             alert('Cannot create RTCPeerConnection object.');
             return;
         }
+        if (isInitiator){
+            sendDataChannel = pc.createDataChannel('__FOOBAR_DATA_CHANNEL_NAME__');
+            sendDataChannel.onopen = onSendChannelStateChange;
+            sendDataChannel.onclose = onSendChannelStateChange;
+        }
+        else{
+            pc.ondatachannel = function(event) {
+                console.log('Receive Channel Callback');
+                receiveDataChannel = event.channel;
+                receiveDataChannel.onmessage = function(event){
+                    console.log('Received Message', event.data);
+                };
+                receiveDataChannel.onopen = onReceiveChannelStateChange;
+                receiveDataChannel.onclose = onReceiveChannelStateChange;
+            };
+        }
 
         pc.addStream(localStream);
         isStarted = true;
@@ -298,6 +323,16 @@ function maybeStart() {
             pc.createOffer(setLocalAndSendMessage, handleCreateOfferError);
         }
     }
+}
+
+function onSendChannelStateChange() {
+  const readyState = sendDataChannel.readyState;
+  console.log('Send channel state is: ' + readyState);
+}
+
+function onReceiveChannelStateChange() {
+  const readyState = receiveDataChannel.readyState;
+  console.log(`Receive channel state is: ${readyState}`);
 }
 
 /////////////////////////////////////////////////////////
