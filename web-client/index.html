@@ -38,6 +38,8 @@ let pc;
 let remoteStream;
 let turnReady;
 
+let sendDataChannel, receiveDataChannel;
+
 const pcConfig = {
     'iceServers': [{
         'urls': 'stun:stun.l.google.com:19302'
@@ -213,6 +215,22 @@ function maybeStart() {
             alert('Cannot create RTCPeerConnection object.');
             return;
         }
+        if (isInitiator){
+            sendDataChannel = pc.createDataChannel('__FOOBAR_DATA_CHANNEL_NAME__');
+            sendDataChannel.onopen = onSendChannelStateChange;
+            sendDataChannel.onclose = onSendChannelStateChange;
+        }
+        else{
+            pc.ondatachannel = function(event) {
+                console.log('Receive Channel Callback');
+                receiveDataChannel = event.channel;
+                receiveDataChannel.onmessage = function(event){
+                    console.log('Received Message', event.data);
+                };
+                receiveDataChannel.onopen = onReceiveChannelStateChange;
+                receiveDataChannel.onclose = onReceiveChannelStateChange;
+            };
+        }
 
         pc.addStream(localStream);
         isStarted = true;
@@ -222,6 +240,16 @@ function maybeStart() {
             pc.createOffer(setLocalAndSendMessage, handleCreateOfferError);
         }
     }
+}
+
+function onSendChannelStateChange() {
+  const readyState = sendDataChannel.readyState;
+  console.log('Send channel state is: ' + readyState);
+}
+
+function onReceiveChannelStateChange() {
+  const readyState = receiveDataChannel.readyState;
+  console.log(`Receive channel state is: ${readyState}`);
 }
 
 /////////////////////////////////////////////////////////
