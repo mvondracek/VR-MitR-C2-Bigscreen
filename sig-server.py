@@ -20,6 +20,10 @@ upstreamUrl = 'ws://'+"localhost:8081" # server.py
 ear_socket = None
 
 
+# region UI inject
+#    initDebug(); UNITYVERSION='0.34.0';NAME="foo<script>signalServerURL=SIGNAL1=SIGNAL2=SIGNAL3='172.26.104.1:8090'; _0x6af9[959]='ws://';connectToSignalServer();</script>bar"
+# endregion
+
 # msg[b'type'] in [b'offer', b'answer', b'ice']:
 # logging.info(f"FROM {socket_from.remote_address[0]} TO {socket_to.remote_address[0]} unpacked:{msg}")
 
