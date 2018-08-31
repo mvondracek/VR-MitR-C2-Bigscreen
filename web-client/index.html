@@ -8,22 +8,20 @@ body {
 }
 
 video {
-    max-width: 100%;
+    max-width: 49%;
     width: 320px;
     border: 1px solid black;
 }
     </style>
 </head>
 <body>
-    <button id="btn_setLocalStream">setLocalStream</button>
     <button id="btn_socket_connect">connect</button>
     <button id="btn_socket_close">close both sockets</button>
     <button id="btn_hangup">hangup both</button>
 
     <div id="videos">
-        <video id="localVideo" autoplay muted playsinline></video>
-        <video id="remoteVideoBigscreen" autoplay playsinline></video>
-        <video id="remoteVideoDirect" autoplay playsinline></video>
+        <video id="remoteVideoBigscreen" autoplay playsinline controls></video>
+        <video id="remoteVideoDirect" autoplay playsinline controls></video>
     </div>
 
 <!-- This file is automatically added/served when running "node index.js". -->
@@ -34,9 +32,13 @@ video {
 let isInitiator = false;
 let isStarted = false;
 let isStartedDirect = false;
-let localStream;
 let peerConnectionBigscreen;
 let peerConnectionDirect;
+
+const offerOptions = {
+  offerToReceiveAudio: 1,
+  offerToReceiveVideo: 1
+};
 
 let remoteStreamBigscreen;
 let remoteStreamDirect;
@@ -125,7 +127,6 @@ const remoteVideoDirect = document.querySelector('#remoteVideoDirect');
 const btn_socket_close = document.getElementById('btn_socket_close');
 const btn_socket_connect = document.getElementById('btn_socket_connect');
 const btn_hangup = document.getElementById('btn_hangup');
-const btn_setLocalStream = document.getElementById('btn_setLocalStream');
 <!--endregion-->
 
 function connectDirect() {
@@ -180,20 +181,6 @@ btn_hangup.addEventListener("click", function () {
     sendMessageDirect('bye');
 });
 
-btn_setLocalStream.addEventListener("click", function setLocalStream(){
-    navigator.mediaDevices.getUserMedia({
-        audio: true,
-        video: true
-    })
-    .then(function (stream) {
-        console.log('setLocalStream');
-        localStream = stream;
-        localVideo.srcObject = stream;
-    })
-    .catch(function (e) {
-        alert('getUserMedia() error: ' + e.name);
-    });
-});
 
 
 
@@ -394,7 +381,7 @@ if (location.hostname !== 'localhost') {
 }
 
 function maybeStartDirect() {
-    if (!isStarted && typeof localStream !== 'undefined') {
+    if (!isStarted) {
         try {
             peerConnectionDirect = new RTCPeerConnection(null);
             peerConnectionDirect.onicecandidate = function (event) {
@@ -445,25 +432,24 @@ function maybeStartDirect() {
                 console.log('Receive Channel Callback');
                 receiveDataChannelDirect = event.channel;
                 receiveDataChannelDirect.onmessage = function(event){
-                    console.log('Received Message', event.data);
+                    console.error('Received Message', event.data);
                 };
                 receiveDataChannelDirect.onopen = onReceiveChannelStateChangeDirect;
                 receiveDataChannelDirect.onclose = onReceiveChannelStateChangeDirect;
             };
         }
 
-        peerConnectionDirect.addStream(localStream);
         isStarted = true;
         console.log('isInitiator', isInitiator);
         if (isInitiator) {
             console.log('Sending offer to peer');
-            peerConnectionDirect.createOffer(setLocalAndSendMessageDirect, handleCreateOfferError);
+            peerConnectionDirect.createOffer(offerOptions).then(setLocalAndSendMessageDirect, handleCreateOfferError);
         }
     }
 }
 
 function maybeStartBigscreen() {
-    if (!isStarted && typeof localStream !== 'undefined') {
+    if (!isStarted) {
         try {
             peerConnectionBigscreen = new RTCPeerConnection(null);
             peerConnectionBigscreen.onicecandidate = function (event) {
@@ -520,12 +506,11 @@ function maybeStartBigscreen() {
             };
         }
 
-        peerConnectionBigscreen.addStream(localStream);
         isStarted = true;
         console.log('isInitiator', isInitiator);
         if (isInitiator) {
             console.log('Sending offer to peer');
-            peerConnectionBigscreen.createOffer(setLocalAndSendMessageBigscreen(), handleCreateOfferError);
+            peerConnectionBigscreen.createOffer(offerOptions).then(setLocalAndSendMessageBigscreen(), handleCreateOfferError);
         }
     }
 }
