@@ -15,17 +15,15 @@ video {
     </style>
 </head>
 <body>
-    <button id="btn_start_initiator">btn_start_initiator</button>
-    <button id="btn_start_other">btn_start_other</button>
-    <hr/>
+    <button id="btn_setLocalStream">setLocalStream</button>
     <button id="btn_socket_connect">connect</button>
-    <button id="btn_socket_close">close</button>
-    <button id="btn_hangup">btn_hangup</button>
+    <button id="btn_socket_close">close both sockets</button>
+    <button id="btn_hangup">hangup both</button>
 
     <div id="videos">
         <video id="localVideo" autoplay muted playsinline></video>
         <video id="remoteVideoBigscreen" autoplay playsinline></video>
-        <video id="remoteVideoClient" autoplay playsinline></video>
+        <video id="remoteVideoDirect" autoplay playsinline></video>
     </div>
 
 <!-- This file is automatically added/served when running "node index.js". -->
@@ -35,13 +33,20 @@ video {
 'use strict';
 let isInitiator = false;
 let isStarted = false;
+let isStartedDirect = false;
 let localStream;
-let pc;
+let peerConnectionBigscreen;
+let peerConnectionDirect;
+
 let remoteStreamBigscreen;
-let remoteStreamClient;
+let remoteStreamDirect;
+
+let allRemoteStreams = [];
+
 let turnReady;
 
-let sendDataChannel, receiveDataChannel;
+let sendDataChannelBigscreen, receiveDataChannelBigscreen;
+let sendDataChannelDirect, receiveDataChannelDirect;
 
 const pcConfig = {
     'iceServers': [{
@@ -49,54 +54,109 @@ const pcConfig = {
     }]
 };
 
+// bigscreen variables
+let roomId = null;
+let SCID = null;
+let PCID = null;
+let userIdBehindServer = null;
+let userIdDirect = null;
+
+function checkRoomId(value){
+    if (roomId === null){
+        roomId = value;
+        console.log('RoomId set', roomId);
+    }
+    else if(roomId !== value){
+        console.error('Error: Different roomId already set.', roomId, value);
+    }
+}
+function checkSCID(value){
+    if (SCID === null){
+        SCID = value;
+        console.log('SCID set', SCID);
+    }
+    else if(SCID !== value){
+        console.error('Error: Different SCID already set.', SCID, value);
+    }
+}
+function checkPCID(value){
+    if (PCID === null){
+        PCID = value;
+        console.log('PCID set', PCID);
+    }
+    else if(PCID !== value){
+        console.error('Error: Different PCID already set. BUT WILL CHANGE NOW!', PCID, value);
+        PCID = value;
+        console.log('PCID set', PCID);
+    }
+}
+function checkUserIdBehindServer(value){
+    if (userIdBehindServer === null){
+        userIdBehindServer = value;
+        console.log('userIdBehindServer set', userIdBehindServer);
+    }
+    else if(userIdBehindServer !== value){
+        console.error('Error: Different userIdBehindServer already set.', userIdBehindServer, value);
+    }
+}
+function checkUserIdDirect(value){
+    if (userIdDirect === null){
+        userIdDirect = value;
+        console.log('userIdDirect set', userIdDirect);
+    }
+    else if(userIdDirect !== value){
+        console.error('Error: Different userIdDirect already set.', userIdDirect, value);
+    }
+}
+// //
+
 /////////////////////////////////////////////
 const wsUri = "ws://172.26.104.1:8090/";
 const bigscreenSignalUrl = 'wss://signal2.bigscreenvr.com';
-let websocket;
+let websocketDirect;
 let websocketBigscreen;
 
 
 <!--region GUI bindings -->
 const localVideo = document.querySelector('#localVideo');
 const remoteVideoBigscreen = document.querySelector('#remoteVideoBigscreen');
-const remoteVideoClient = document.querySelector('#remoteVideoClient');
+const remoteVideoDirect = document.querySelector('#remoteVideoDirect');
 
 const btn_socket_close = document.getElementById('btn_socket_close');
 const btn_socket_connect = document.getElementById('btn_socket_connect');
 const btn_hangup = document.getElementById('btn_hangup');
-const btn_start_initiator = document.getElementById('btn_start_initiator');
-const btn_start_other = document.getElementById('btn_start_other');
+const btn_setLocalStream = document.getElementById('btn_setLocalStream');
 <!--endregion-->
 
-function connect() {
-    websocket = new WebSocket(wsUri);
-    websocket.binaryType = 'arraybuffer';
-    websocket.onopen = function (event) {
-        console.log('onOpen connected');
+function connectDirect() {
+    websocketDirect = new WebSocket(wsUri);
+    websocketDirect.binaryType = 'arraybuffer';
+    websocketDirect.onopen = function (event) {
+        console.log('onOpen connected', event);
     };
-    websocket.onclose = function (event) {
-        console.log('onClose disconnected');
+    websocketDirect.onclose = function (event) {
+        console.log('onClose disconnected', event);
     };
-    websocket.onmessage = function (event) {
-        onMessage(event);
+    websocketDirect.onmessage = function (event) {
+        onMessageDirect(event);
     };
-    websocket.onerror = function (event) {
+    websocketDirect.onerror = function (event) {
         console.log('onError event', event);
     };
 
     btn_socket_close.addEventListener("click", function () {
-        websocket.close();
+        websocketDirect.close();
     });
 }
 
-function connect2Bigscreen() {
+function connectBigscreen() {
     websocketBigscreen = new WebSocket(bigscreenSignalUrl);
     websocketBigscreen.binaryType = 'arraybuffer';
     websocketBigscreen.onopen = function (event) {
-        console.log('websocketBigscreen.onOpen');
+        console.log('websocketBigscreen.onOpen', event);
     };
     websocketBigscreen.onclose = function (event) {
-        console.log('websocketBigscreen.onClose');
+        console.log('websocketBigscreen.onClose', event);
     };
     websocketBigscreen.onmessage = function (event) {
         onMessageBigscreen(event);
@@ -111,50 +171,37 @@ function connect2Bigscreen() {
 }
 
 btn_socket_connect.addEventListener("click", function () {
-    connect();
-    connect2Bigscreen();
-});
-btn_start_initiator.addEventListener("click", function () {
-    connect();
-    isInitiator = true;
-    start();
-});
-btn_start_other.addEventListener("click", function () {
-    connect();
-    start();
+    connectDirect();
+    connectBigscreen();
 });
 btn_hangup.addEventListener("click", function () {
     console.log('Hanging up.');
     stop();
-    sendMessage('bye');
+    sendMessageDirect('bye');
 });
 
-function start(){
+btn_setLocalStream.addEventListener("click", function setLocalStream(){
     navigator.mediaDevices.getUserMedia({
         audio: true,
         video: true
     })
-        .then(gotStream)
-        .catch(function (e) {
-            alert('getUserMedia() error: ' + e.name);
-        });
-}
+    .then(function (stream) {
+        console.log('setLocalStream');
+        localStream = stream;
+        localVideo.srcObject = stream;
+    })
+    .catch(function (e) {
+        alert('getUserMedia() error: ' + e.name);
+    });
+});
 
-function gotStream(stream) {
-    console.log('Adding local stream.');
-    localStream = stream;
-    localVideo.srcObject = stream;
-    sendMessage('got user media');
-    if (isInitiator) {
-        maybeStart();
-    }
-}
+
 
 ////////////////////////////////////////////////
 
-function sendMessage(message) {
+function sendMessageDirect(message) {
     console.log('MITM -> Client ', message);
-    websocket.send(msgpack.encode(message));
+    websocketDirect.send(msgpack.encode(message));
 }
 
 function sendMessageBigscreen(message) {
@@ -169,31 +216,83 @@ function onMessageBigscreen(event){
     // server to client forwarding rules
     switch (message.type) {
         case 'room-latest':
-        case 'room-created':
-        case 'user-joined':
         case 'admin':
-        case 'user-ready':
-        case 'user-left':
-        case 'ice': // TODO: intercept
-        case 'offer': // TODO: intercept
-        case 'answer': // TODO: intercept
-            // forward to the client
-            sendMessage(message);
+            // server to client content not useful
+            sendMessageDirect(message); // forward to the client
             break;
+        case 'room-created':
+            checkRoomId(message.roomId);
+            sendMessageDirect(message); // forward to the client
+            break;
+        case 'user-joined':
+            checkRoomId(message.state.roomId);
+            sendMessageDirect(message); // forward to the client
+            break;
+        case 'user-ready':
+            checkRoomId(message.state.roomId);
+            sendMessageDirect(message); // forward to the client
+            break;
+        case 'user-left':
+            checkRoomId(message.state.roomId);
+            sendMessageDirect(message); // forward to the client
+            break;
+
+        case 'ice':
+            console.log('onMessageBigscreen received ICE');
+            checkRoomId(message.roomId);
+            checkSCID(message.SCID);
+            checkPCID(message.PCID);
+            checkUserIdBehindServer(message.fromUser);
+            checkUserIdDirect(message.targetUser);
+
+            const candidateStartPos = message.value.indexOf('candidate:');
+            let beforeCandidate  = message.value.slice(0,candidateStartPos);
+            let sdpMLineIndex = beforeCandidate.slice(0, beforeCandidate.indexOf('bigscreen_sdp_mline_index'));
+            let sdpMid = beforeCandidate.slice(
+                beforeCandidate.indexOf('bigscreen_sdp_mline_index') + 'bigscreen_sdp_mline_index'.length,
+                beforeCandidate.indexOf('bigscreen_sdp_mid'));
+            let candidate = new RTCIceCandidate({
+                sdpMid: sdpMid,
+                sdpMLineIndex: sdpMLineIndex,
+                candidate: message.value.slice(candidateStartPos)
+            });
+            peerConnectionBigscreen.addIceCandidate(candidate);
+            break;
+
+        case 'offer':
+            console.log('onMessageBigscreen received OFFER');
+            checkRoomId(message.roomId);
+            checkSCID(message.SCID);
+            checkPCID(message.PCID);
+            checkUserIdBehindServer(message.fromUser);
+            checkUserIdDirect(message.targetUser);
+
+            if (!isInitiator && !isStarted) {
+                maybeStartBigscreen();
+            }
+            peerConnectionBigscreen.setRemoteDescription(new RTCSessionDescription(
+                {type:message.type, sdp:message.value}));
+            doAnswerBigscreen();
+            break;
+        case 'answer':
+            console.log('onMessageBigscreen received ANSWER');
+            checkUserIdBehindServer(message.fromUser);
+            checkSCID(message.SCID);
+            checkPCID(message.PCID);
+
+            if(isStarted) {
+                peerConnectionBigscreen.setRemoteDescription(new RTCSessionDescription(
+                    {type:message.type, sdp:message.value}));
+            }
+            break;
+
         default:
             console.log('Unexpected message type (server to client):', message);
             break;
     }
 }
 
-function setLocalAndSendMessageBigscreen(sessionDescription) {
-    pc.setLocalDescription(sessionDescription);
-    console.log('setLocalAndSendMessage sending message', sessionDescription);
-    sendMessageBigscreen(sessionDescription); // TODO edit to match bigscreens format
-}
-
-// This client receives a message
-function onMessage(event) {
+function onMessageDirect(event) {
     let message = msgpack.decode(new Uint8Array(event.data));
     console.log('Client -> MITM', message);
 
@@ -201,57 +300,92 @@ function onMessage(event) {
     switch (message.type) {
         case 'room-latest':
         case 'register-desktop':
-        case 'room-create':
-        case 'room-join':
-        case 'admin':
-        case 'user-seat':
-        case 'user-ready':
         case 'room-leave':
-        case 'offer': // TODO: intercept
-        case 'answer': // TODO: intercept
-        case 'ice': // TODO: intercept
-            // forward to the server
-            sendMessageBigscreen(message);
+        case 'room-create':
+            // client to server content not useful
+            sendMessageBigscreen(message); // forward to the server
             break;
+
+        case 'room-join':
+            checkRoomId(message.roomId);
+            sendMessageBigscreen(message); // forward to the server
+            break;
+
+        case 'admin':
+            checkRoomId(message.roomId);
+            sendMessageBigscreen(message); // forward to the server
+            break;
+
+        case 'user-seat':
+            checkUserIdDirect(message.userId);
+            checkRoomId(message.roomId);
+            sendMessageBigscreen(message); // forward to the server
+            break;
+
+        case 'user-ready':
+            checkUserIdDirect(message.userId);
+            checkRoomId(message.roomId);
+            sendMessageBigscreen(message); // forward to the server
+            break;
+
+        case 'ice':
+            console.log('onMessageDirect received ICE');
+            checkRoomId(message.roomId);
+            checkUserIdBehindServer(message.targetUser);
+            checkUserIdDirect(message.fromUser);
+            checkSCID(message.SCID);
+            checkPCID(message.PCID);
+
+            const candidateStartPos = message.value.indexOf('candidate:');
+            let beforeCandidate  = message.value.slice(0,candidateStartPos);
+            let sdpMLineIndex = beforeCandidate.slice(0, beforeCandidate.indexOf('bigscreen_sdp_mline_index'));
+            let sdpMid = beforeCandidate.slice(
+                beforeCandidate.indexOf('bigscreen_sdp_mline_index') + 'bigscreen_sdp_mline_index'.length,
+                beforeCandidate.indexOf('bigscreen_sdp_mid'));
+            let candidate = new RTCIceCandidate({
+                sdpMid: sdpMid,
+                sdpMLineIndex: sdpMLineIndex,
+                candidate: message.value.slice(candidateStartPos)
+            });
+            peerConnectionDirect.addIceCandidate(candidate);
+            break;
+
+        case 'offer':
+            console.log('onMessageDirect received OFFER');
+            checkRoomId(message.roomId);
+            checkUserIdBehindServer(message.targetUser);
+            checkUserIdDirect(message.fromUser);
+            checkSCID(message.SCID);
+            checkPCID(message.PCID);
+
+            if (!isInitiator && !isStartedDirect) {
+                maybeStartDirect();
+            }
+            peerConnectionDirect.setRemoteDescription(new RTCSessionDescription(
+                {type:message.type, sdp:message.value}));
+            doAnswerDirect();
+            break;
+        case 'answer':
+            console.log('onMessageDirect received ANSWER');
+            checkRoomId(message.roomId);
+            checkUserIdBehindServer(message.targetUser);
+            checkUserIdDirect(message.fromUser);
+            checkSCID(message.SCID);
+            checkPCID(message.PCID);
+
+            if(isStartedDirect) {
+                peerConnectionDirect.setRemoteDescription(new RTCSessionDescription(
+                    {type:message.type, sdp:message.value}));
+            }
+            break;
+
         default:
-            console.log('Unexpected message type (client to server):', message);
+            console.log('onMessageDirect Unexpected message type (client to server):', message);
             break;
     }
-/*
-
-
-    if (message === 'got user media') {
-        maybeStart();
-    } else if (message.type === 'offer') {
-        if (!isInitiator && !isStarted) {
-            maybeStart();
-        }
-        pc.setRemoteDescription(new RTCSessionDescription(message));
-        doAnswer();
-    } else if (message.type === 'answer' && isStarted) {
-        pc.setRemoteDescription(new RTCSessionDescription(message));
-    } else if (message.type === 'ice' && isStarted) {
-        let candidate = new RTCIceCandidate({
-            sdpMLineIndex: message.label,
-            candidate: message.value
-        });
-        pc.addIceCandidate(candidate);
-    } else if (message === 'bye' && isStarted) {
-        console.log('Session terminated.');
-        stop();
-        isInitiator = false;
-    }
-*/
 }
 
 ////////////////////////////////////////////////////
-
-
-
-
-
-
-
 
 if (location.hostname !== 'localhost') {
     requestTurn(
@@ -259,37 +393,39 @@ if (location.hostname !== 'localhost') {
     );
 }
 
-function maybeStart() {
+function maybeStartDirect() {
     if (!isStarted && typeof localStream !== 'undefined') {
         try {
-            pc = new RTCPeerConnection(null);
-            pc.onicecandidate = function (event) {
+            peerConnectionDirect = new RTCPeerConnection(null);
+            peerConnectionDirect.onicecandidate = function (event) {
                 console.log('icecandidate event: ', event);
                 if (event.candidate) {
-                    sendMessage({
+                    console.log('maybeStartDirect',event.candidate.sdpMLineIndex, event.candidate.sdpMid);
+                    if(SCID === null){console.error('ERROR: SCID IS NULL')}
+                    sendMessageDirect({
                         type: 'ice',
-                        roomId: 'room-tycm6b8o', // TODO: dynamically set from messages
-                        label: event.candidate.sdpMLineIndex, // TODO old
-                        id: event.candidate.sdpMid, // TODO old
-                        value: event.candidate.candidate,
+                        roomId: roomId,
+                        value: event.candidate.sdpMLineIndex + 'bigscreen_sdp_mline_index'
+                            + event.candidate.sdpMid + 'bigscreen_sdp_mid' + event.candidate.candidate,
                         fromDevice: 'desktop',
                         targetDevice: 'desktop',
-                        fromUser: "user1",// TODO: dynamically set from messages
-                        targetUser: "user2",// TODO: dynamically set from messages
-                        SCID: "574d4a4b-42f0-c3cf-0921-9d8215f830e5",// TODO: dynamically set from messages
-                        PCID: 0 ,// TODO: dynamically set from messages
+                        fromUser: userIdBehindServer,
+                        targetUser: userIdDirect,
+                        SCID: SCID,
+                        PCID: PCID,
                     });
                 } else {
                     console.log('End of candidates.');
                 }
             };
-            pc.ontrack  = function (event) {
+            peerConnectionDirect.ontrack  = function (event) {
                 console.log('Remote streams added.');
                 console.log(event.streams);
-                remoteStreamBigscreen = event.streams[0];
-                remoteVideoBigscreen.srcObject = remoteStreamBigscreen;
+                allRemoteStreams.push(event.streams);
+                remoteStreamDirect = event.streams[0];
+                remoteVideoDirect.srcObject = remoteStreamDirect;
             };
-            pc.onremovestream = function (event) {
+            peerConnectionDirect.onremovestream = function (event) {
                 console.log('Remote stream removed. Event: ', event);
             };
 
@@ -300,40 +436,116 @@ function maybeStart() {
             return;
         }
         if (isInitiator){
-            sendDataChannel = pc.createDataChannel('__FOOBAR_DATA_CHANNEL_NAME__');
-            sendDataChannel.onopen = onSendChannelStateChange;
-            sendDataChannel.onclose = onSendChannelStateChange;
+            sendDataChannelDirect = peerConnectionDirect.createDataChannel('__FOOBAR_DATA_CHANNEL_NAME_DIRECT__');
+            sendDataChannelDirect.onopen = onSendChannelStateChangeDirect;
+            sendDataChannelDirect.onclose = onSendChannelStateChangeDirect;
         }
         else{
-            pc.ondatachannel = function(event) {
+            peerConnectionDirect.ondatachannel = function(event) {
                 console.log('Receive Channel Callback');
-                receiveDataChannel = event.channel;
-                receiveDataChannel.onmessage = function(event){
+                receiveDataChannelDirect = event.channel;
+                receiveDataChannelDirect.onmessage = function(event){
                     console.log('Received Message', event.data);
                 };
-                receiveDataChannel.onopen = onReceiveChannelStateChange;
-                receiveDataChannel.onclose = onReceiveChannelStateChange;
+                receiveDataChannelDirect.onopen = onReceiveChannelStateChangeDirect;
+                receiveDataChannelDirect.onclose = onReceiveChannelStateChangeDirect;
             };
         }
 
-        pc.addStream(localStream);
+        peerConnectionDirect.addStream(localStream);
         isStarted = true;
         console.log('isInitiator', isInitiator);
         if (isInitiator) {
             console.log('Sending offer to peer');
-            pc.createOffer(setLocalAndSendMessage, handleCreateOfferError);
+            peerConnectionDirect.createOffer(setLocalAndSendMessageDirect, handleCreateOfferError);
         }
     }
 }
 
-function onSendChannelStateChange() {
-  const readyState = sendDataChannel.readyState;
-  console.log('Send channel state is: ' + readyState);
+function maybeStartBigscreen() {
+    if (!isStarted && typeof localStream !== 'undefined') {
+        try {
+            peerConnectionBigscreen = new RTCPeerConnection(null);
+            peerConnectionBigscreen.onicecandidate = function (event) {
+                console.log('peerConnectionBigscreen icecandidate event: ', event);
+                if (event.candidate) {
+                    console.log('maybeStartDirect',event.candidate.sdpMLineIndex, event.candidate.sdpMid);
+                    if(SCID === null){console.error('ERROR: SCID IS NULL')}
+                    sendMessageBigscreen({
+                        type: 'ice',
+                        roomId: roomId,
+                        value: event.candidate.sdpMLineIndex + 'bigscreen_sdp_mline_index'
+                            + event.candidate.sdpMid + 'bigscreen_sdp_mid' + event.candidate.candidate,                        fromDevice: 'desktop',
+                        targetDevice: 'desktop',
+                        fromUser: userIdDirect,
+                        targetUser: userIdBehindServer,
+                        SCID: SCID,
+                        PCID: PCID,
+                    });
+                } else {
+                    console.log('End of candidates.');
+                }
+            };
+            peerConnectionBigscreen.ontrack  = function (event) {
+                console.log('Remote streams added.');
+                console.log(event.streams);
+                allRemoteStreams.push(event.streams);
+                remoteStreamBigscreen = event.streams[0];
+                remoteVideoBigscreen.srcObject = remoteStreamBigscreen;
+            };
+            peerConnectionBigscreen.onremovestream = function (event) {
+                console.log('Remote stream removed. Event: ', event);
+            };
+
+            console.log('Created RTCPeerConnnection');
+        } catch (e) {
+            console.log('Failed to create PeerConnection, exception: ' + e.message);
+            alert('Cannot create RTCPeerConnection object.');
+            return;
+        }
+        if (isInitiator){
+            sendDataChannelBigscreen = peerConnectionBigscreen.createDataChannel('__FOOBAR_DATA_CHANNEL_NAME_DIRECT__');
+            sendDataChannelBigscreen.onopen = onSendChannelStateChangeBigscreen;
+            sendDataChannelBigscreen.onclose = onSendChannelStateChangeBigscreen;
+        }
+        else{
+            peerConnectionBigscreen.ondatachannel = function(event) {
+                console.log('Receive Channel Callback');
+                receiveDataChannelBigscreen = event.channel;
+                receiveDataChannelBigscreen.onmessage = function(event){
+                    console.log('Received Message', event.data);
+                };
+                receiveDataChannelBigscreen.onopen = onReceiveChannelStateChangeBigscreen;
+                receiveDataChannelBigscreen.onclose = onReceiveChannelStateChangeBigscreen;
+            };
+        }
+
+        peerConnectionBigscreen.addStream(localStream);
+        isStarted = true;
+        console.log('isInitiator', isInitiator);
+        if (isInitiator) {
+            console.log('Sending offer to peer');
+            peerConnectionBigscreen.createOffer(setLocalAndSendMessageBigscreen(), handleCreateOfferError);
+        }
+    }
 }
 
-function onReceiveChannelStateChange() {
-  const readyState = receiveDataChannel.readyState;
-  console.log(`Receive channel state is: ${readyState}`);
+function onSendChannelStateChangeBigscreen() {
+  const readyState = sendDataChannelBigscreen.readyState;
+  console.log('sendDataChannelBigscreen Send channel state is: ' + readyState);
+}
+function onSendChannelStateChangeDirect() {
+  const readyState = sendDataChannelDirect.readyState;
+  console.log('sendDataChannelDirect Send channel state is: ' + readyState);
+}
+
+function onReceiveChannelStateChangeBigscreen() {
+  const readyState = receiveDataChannelBigscreen.readyState;
+  console.log(`receiveDataChannelBigscreen Receive channel state is: ${readyState}`);
+}
+function onReceiveChannelStateChangeDirect() {
+  const readyState = receiveDataChannelDirect.readyState;
+  console.log(`receiveDataChannelDirect Receive channel state is: ${readyState}`);
 }
 
 /////////////////////////////////////////////////////////
@@ -345,19 +557,57 @@ function handleCreateOfferError(event) {
     console.log('createOffer() error: ', event);
 }
 
-function doAnswer() {
+function setLocalAndSendMessageDirect(sessionDescription) {
+    peerConnectionDirect.setLocalDescription(sessionDescription);
+    let sessionDescriptionMessage = {
+        type: sessionDescription.type,
+        roomId: roomId,
+        value: sessionDescription.sdp,
+        fromDevice: 'desktop',
+        targetDevice: 'desktop',
+        fromUser: userIdBehindServer,
+        targetUser: userIdDirect,
+        SCID: SCID,
+        PCID: PCID,
+    };
+    console.log('setLocalAndSendMessageDirect sending message', sessionDescriptionMessage);
+    sendMessageDirect(sessionDescriptionMessage);
+}
+
+function setLocalAndSendMessageBigscreen(sessionDescription) {
+    peerConnectionBigscreen.setLocalDescription(sessionDescription);
+    let sessionDescriptionMessage = {
+        type: sessionDescription.type,
+        roomId: roomId,
+        value: sessionDescription.sdp,
+        fromDevice: 'desktop',
+        targetDevice: 'desktop',
+        fromUser: userIdDirect,
+        targetUser: userIdBehindServer,
+        SCID: SCID,
+        PCID: PCID,
+    };
+    console.log('setLocalAndSendMessageBigscreen sending message', sessionDescriptionMessage);
+    sendMessageBigscreen(sessionDescriptionMessage);
+}
+
+
+function doAnswerDirect() {
     console.log('Sending answer to peer.');
-    pc.createAnswer().then(
-        setLocalAndSendMessage,
+    peerConnectionDirect.createAnswer().then(
+        setLocalAndSendMessageDirect,
         onCreateSessionDescriptionError
     );
 }
 
-function setLocalAndSendMessage(sessionDescription) {
-    pc.setLocalDescription(sessionDescription);
-    console.log('setLocalAndSendMessage sending message', sessionDescription);
-    sendMessage(sessionDescription);
+function doAnswerBigscreen() {
+    console.log('doAnswerBigscreen Sending answer to peer.');
+    peerConnectionBigscreen.createAnswer().then(
+        setLocalAndSendMessageBigscreen,
+        onCreateSessionDescriptionError
+    );
 }
+
 
 function onCreateSessionDescriptionError(error) {
     console.log('Failed to create session description: ' + error.toString());
@@ -365,7 +615,7 @@ function onCreateSessionDescriptionError(error) {
 
 function requestTurn(turnURL) {
     let turnExists = false;
-    for (var i in pcConfig.iceServers) {
+    for (let i in pcConfig.iceServers) {
         if (pcConfig.iceServers[i].urls.substr(0, 5) === 'turn:') {
             turnExists = true;
             turnReady = true;
@@ -395,8 +645,10 @@ function requestTurn(turnURL) {
 
 function stop() {
     isStarted = false;
-    pc.close();
-    pc = null;
+    peerConnectionBigscreen.close();
+    peerConnectionBigscreen = null;
+    peerConnectionDirect.close();
+    peerConnectionDirect = null;
 }
 </script>
 </body>
