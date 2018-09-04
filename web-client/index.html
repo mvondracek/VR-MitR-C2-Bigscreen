@@ -3,15 +3,17 @@
 <head>
     <meta charset="utf-8" />
     <style>
-body {
-  font-family: sans-serif;
-}
-
-video {
-    max-width: 49%;
-    width: 320px;
-    border: 1px solid black;
-}
+        body {
+          font-family: sans-serif;
+        }
+        video {
+            max-width: 100%;
+            border: 1px solid black;
+        }
+        #video > div {
+            display: inline-block;
+            max-width: 32%;
+        }
     </style>
 </head>
 <body>
@@ -76,7 +78,7 @@ const pcConfig = {
     }]
 };
 
-// bigscreen variables
+<!--region variables for Bigscreen signaling protocol-->
 let roomId = null;
 let SCID = null;
 let PCID = null;
@@ -130,9 +132,9 @@ function checkUserIdDirect(value){
         console.error('Error: Different userIdDirect already set.', userIdDirect, value);
     }
 }
-// //
+<!--endregion-->
 
-/////////////////////////////////////////////
+
 const wsUri = "ws://172.26.104.1:8090/";
 const bigscreenSignalUrl = 'wss://signal2.bigscreenvr.com';
 let websocketDirect;
