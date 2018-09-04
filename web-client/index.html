@@ -19,10 +19,30 @@ video {
     <button id="btn_socket_close">close both sockets</button>
     <button id="btn_hangup">hangup both</button>
 
-    <div id="videos">
-        <video id="remoteVideoBigscreen" autoplay playsinline controls></video>
-        <video id="remoteVideoDirect" autoplay playsinline controls></video>
-    </div>
+    <section id="video">
+        <div>
+            <video id="remoteVideoDirect" autoplay playsinline controls></video>
+            <div id="remoteVideoDirect-stats"></div>
+            <div id="remoteVideoDirect-bitrate"></div>
+            <div id="remoteVideoDirect-peer"></div>
+        </div>
+        <div >
+            <video id="localVideo" playsinline autoplay controls></video>
+            <div id="localVideo-stats"></div>
+        </div>
+        <div>
+            <video id="remoteVideoBigscreen" autoplay playsinline controls></video>
+            <div id="remoteVideoBigscreen-stats"></div>
+            <div id="remoteVideoBigscreen-bitrate"></div>
+            <div id="remoteVideoBigscreen-peer"></div>
+        </div>
+    </section>
+
+    <section>
+        <div id="senderStats"></div>
+        <div id="receiverStats"></div>
+    </section>
+
 
 <!-- This file is automatically added/served when running "node index.js". -->
 <script src="./adapter-latest.js"></script>
@@ -626,6 +646,167 @@ function requestTurn(turnURL) {
         xhr.send();
     }
 }
+
+
+
+
+<!--region 3rd party code  -->
+/** Source code from https://github.com/webrtc/samples/blob/gh-pages/src/content/peerconnection/constraints/js/main.js */
+/*
+
+Copyright (c) 2014, The WebRTC project authors. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+  * Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+
+  * Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in
+    the documentation and/or other materials provided with the
+    distribution.
+
+  * Neither the name of Google nor the names of its contributors may
+    be used to endorse or promote products derived from this software
+    without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+ */
+let bytesPrev;
+let timestampPrev;
+
+const remoteVideoDirectBitrate = document.querySelector('#remoteVideoDirect-bitrate');
+const remoteVideoDirectPeer = document.querySelector('#remoteVideoDirect-peer');
+
+const senderStatsDiv = document.querySelector('#senderStats');
+const receiverStatsDiv = document.querySelector('#receiverStats');
+
+const localVideoStats = document.querySelector('#localVideo-stats');
+const remoteVideoDirectStats = document.querySelector('#remoteVideoDirect-stats');
+const remoteVideoBigscreenStats = document.querySelector('#remoteVideoBigscreen-stats');
+
+
+function showRemoteStats(results) {
+  const statsString = dumpStats(results);
+  receiverStatsDiv.innerHTML = `<h2>Receiver stats</h2>${statsString}`;
+  // calculate video bitrate
+  results.forEach(report => {
+    const now = report.timestamp;
+
+    let bitrate;
+    if (report.type === 'inbound-rtp' && report.mediaType === 'video') {
+      const bytes = report.bytesReceived;
+      if (timestampPrev) {
+        bitrate = 8 * (bytes - bytesPrev) / (now - timestampPrev);
+        bitrate = Math.floor(bitrate);
+      }
+      bytesPrev = bytes;
+      timestampPrev = now;
+    }
+    if (bitrate) {
+      bitrate += ' kbits/sec';
+      remoteVideoDirectBitrate.innerHTML = `<strong>Bitrate:</strong>${bitrate}`;
+    }
+  });
+
+  // figure out the peer's ip
+  let activeCandidatePair = null;
+  let remoteCandidate = null;
+
+  // Search for the candidate pair, spec-way first.
+  results.forEach(report => {
+    if (report.type === 'transport') {
+      activeCandidatePair = results.get(report.selectedCandidatePairId);
+    }
+  });
+  // Fallback for Firefox.
+  if (!activeCandidatePair) {
+    results.forEach(report => {
+      if (report.type === 'candidate-pair' && report.selected) {
+        activeCandidatePair = report;
+      }
+    });
+  }
+  if (activeCandidatePair && activeCandidatePair.remoteCandidateId) {
+    remoteCandidate = results.get(activeCandidatePair.remoteCandidateId);
+  }
+  if (remoteCandidate) {
+    if (remoteCandidate.ip && remoteCandidate.port) {
+      remoteVideoDirectPeer.innerHTML = `<strong>Connected to:</strong>${remoteCandidate.ip}:${remoteCandidate.port}`;
+    } else if (remoteCandidate.ipAddress && remoteCandidate.portNumber) {
+      // Fall back to old names.
+      remoteVideoDirectPeer.innerHTML = `<strong>Connected to:</strong>${remoteCandidate.ipAddress}:${remoteCandidate.portNumber}`;
+    }
+  }
+}
+
+function showLocalStats(results) {
+  const statsString = dumpStats(results);
+  senderStatsDiv.innerHTML = `<h2>Sender stats</h2>${statsString}`;
+}
+
+// Display statistics
+setInterval(() => {
+  if (peerConnectionDirect) {
+    peerConnectionDirect
+      .getStats(null)
+      .then(showRemoteStats, err => console.log(err));
+    peerConnectionDirect
+      .getStats(null)
+      .then(showLocalStats, err => console.log(err));
+  } else {
+    console.log('Not connected yet');
+  }
+  // Collect some stats from the video tags.
+  if (localVideo.videoWidth) {
+    const width = localVideo.videoWidth;
+    const height = localVideo.videoHeight;
+    localVideoStats.innerHTML = `<strong>Video dimensions:</strong> ${width}x${height}px`;
+  }
+  if (remoteVideoDirect.videoWidth) {
+    const rHeight = remoteVideoDirect.videoHeight;
+    const rWidth = remoteVideoDirect.videoWidth;
+    remoteVideoDirectStats.innerHTML = `<strong>Video dimensions:</strong> ${rWidth}x${rHeight}px`;
+  }
+    if (remoteVideoBigscreen.videoWidth) {
+    const rHeight = remoteVideoBigscreen.videoHeight;
+    const rWidth = remoteVideoBigscreen.videoWidth;
+    remoteVideoBigscreenStats.innerHTML = `<strong>Video dimensions:</strong> ${rWidth}x${rHeight}px`;
+  }
+}, 1000);
+
+// Dumping a stats variable as a string.
+// might be named toString?
+function dumpStats(results) {
+  let statsString = '';
+  results.forEach(res => {
+    statsString += '<h3>Report type=';
+    statsString += res.type;
+    statsString += '</h3>\n';
+    statsString += `id ${res.id}<br>`;
+    statsString += `time ${res.timestamp}<br>`;
+    Object.keys(res).forEach(k => {
+      if (k !== 'timestamp' && k !== 'type' && k !== 'id') {
+        statsString += `${k}: ${res[k]}<br>`;
+      }
+    });
+  });
+  return statsString;
+}
+<!--endregion-->
 
 
 function stop() {
