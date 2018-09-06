@@ -18,8 +18,6 @@
 </head>
 <body>
     <button id="btn_socket_connect">connect</button>
-    <button id="btn_socket_close">close both sockets</button>
-    <button id="btn_hangup">hangup both</button>
 
     <section id="video">
         <div>
@@ -146,9 +144,7 @@ const localVideo = document.querySelector('#localVideo');
 const remoteVideoBigscreen = document.querySelector('#remoteVideoBigscreen');
 const remoteVideoDirect = document.querySelector('#remoteVideoDirect');
 
-const btn_socket_close = document.getElementById('btn_socket_close');
 const btn_socket_connect = document.getElementById('btn_socket_connect');
-const btn_hangup = document.getElementById('btn_hangup');
 <!--endregion-->
 
 function connectDirect() {
@@ -166,10 +162,6 @@ function connectDirect() {
     websocketDirect.onerror = function (event) {
         console.log('onError event', event);
     };
-
-    btn_socket_close.addEventListener("click", function () {
-        websocketDirect.close();
-    });
 }
 
 function connectBigscreen() {
@@ -187,20 +179,11 @@ function connectBigscreen() {
     websocketBigscreen.onerror = function (event) {
         console.log('websocketBigscreen.onError', event);
     };
-
-    btn_socket_close.addEventListener("click", function () {
-        websocketBigscreen.close();
-    });
 }
 
 btn_socket_connect.addEventListener("click", function () {
     connectDirect();
     connectBigscreen();
-});
-btn_hangup.addEventListener("click", function () {
-    console.log('Hanging up.');
-    stop();
-    sendMessageDirect('bye');
 });
 
 
