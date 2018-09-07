@@ -18,6 +18,11 @@
 </head>
 <body>
     <button id="btn_socket_connect">connect</button>
+    <div id="videos"></div>
+
+
+
+
     <video id="remoteVideoDirect" autoplay playsinline controls></video>
 
 
@@ -26,15 +31,21 @@
 <script src="./msgpack.min.js"></script>
 <script>
 'use strict';
-let isInitiator = false;
-let isStarted = [false, false];
 
 const offerOptions = {
   offerToReceiveAudio: 1,
   offerToReceiveVideo: 1
 };
 
-let remoteStream;
+function Connection(userId, scid, pcid){
+    this.userId = userId;
+    this.scid = scid;
+    this.pcid = pcid;
+    this.isStarted = false;
+    this.isInitiator = false;
+    this.rtcPeerConnection = null;
+}
+let connections = [];
 
 let allRemoteStreams = [];
 
@@ -49,10 +60,6 @@ const pcConfig = {
 };
 
 <!--region variables for Bigscreen signaling protocol-->
-let SCIDLookup = [];
-let globSCID;
-let PCLookup = [];
-
 let NAME = 'Mallory1';
 let roomId = 'room-';
 let myUserId;
@@ -72,6 +79,7 @@ let websocket;
 <!--region GUI bindings -->
 const remoteVideoDirect = document.querySelector('#remoteVideoDirect');
 const btn_socket_connect = document.getElementById('btn_socket_connect');
+const videosElement = document.getElementById('videos');
 <!--endregion-->
 
 function connect() {
@@ -138,8 +146,6 @@ function onMessage(event) {
         case 'ice':
             console.log('onMessage received ICE');
             console.assert(message.fromDevice === 'desktop', message.fromDevice);
-            SCIDLookup[message.SCID] = message.fromUser;
-            globSCID = message.SCID; // todo
 
             const candidateStartPos = message.value.indexOf('candidate:');
             let beforeCandidate  = message.value.slice(0,candidateStartPos);
@@ -152,20 +158,27 @@ function onMessage(event) {
                 sdpMLineIndex: sdpMLineIndex,
                 candidate: message.value.slice(candidateStartPos)
             });
-            PCLookup[message.PCID].addIceCandidate(candidate);
+            {
+                let connection = connections.find(function(c){return c.userId === message.fromUser && c.pcid === message.PCID});
+                console.log('ice conn', connection);
+                connection.rtcPeerConnection.addIceCandidate(candidate);
+            }
             break;
         case 'offer':
             console.log('onMessage received OFFER');
             console.assert(message.fromDevice === 'desktop', message.fromDevice);
-            SCIDLookup[message.SCID] = message.fromUser;
-            globSCID = message.SCID; // todo
 
-            if (!isInitiator && !isStarted[message.PCID]) {
-                maybeStart(globSCID, message.PCID);
+            {
+                let connection = new Connection(message.fromUser, message.SCID, message.PCID);
+                connections.push(connection);
+
+                if (!connection.isInitiator && !connection.isStarted) {
+                    maybeStart(connection);
+                }
+                connection.rtcPeerConnection.setRemoteDescription(new RTCSessionDescription(
+                    {type: message.type, sdp: message.value, SCID: connection.scid, pcid: connection.pcid}));
+                doAnswer(connection);
             }
-            PCLookup[message.PCID].setRemoteDescription(new RTCSessionDescription(
-                {type:message.type, sdp:message.value, SCID:globSCID, pcid:message.PCID}));
-            doAnswer(message.PCID);
             break;
         case 'answer':
             console.error('onMessage received ANSWER');
@@ -174,12 +187,17 @@ function onMessage(event) {
             console.assert(message.targetUser === myUserId, message.targetUser, myUserId);
             console.assert(message.fromDevice === 'desktop', message.fromDevice);
             console.assert(message.targetDevice === 'desktop', message.targetDevice);
-            SCIDLookup[message.SCID] = message.fromUser;
-            globSCID = message.SCID; // todo
-
-            if(isStarted[message.PCID]) {
-                PCLookup[message.PCID].setRemoteDescription(new RTCSessionDescription(
-                    {type:message.type, sdp:message.value, scid:globSCID, pcid:message.PCID}));
+            {
+                let connection = connections.find(function(c){return c.userId === message.fromUser && c.pcid === message.PCID});
+                if (connection.isStarted) {
+                    connection.setRemoteDescription(new RTCSessionDescription(
+                        {
+                            type: message.type,
+                            sdp: message.value,
+                            scid: connection.scid,
+                            pcid: connection.pcid
+                        }));
+                }
             }
             break;
         default:
@@ -222,15 +240,13 @@ if (location.hostname !== 'localhost') {
     );
 }
 
-function maybeStart(SCID, PCID) {
-    if (!isStarted[PCID]) {
+function maybeStart(connection) {
+    if (!connection.isStarted) {
         try {
-            PCLookup[PCID] = new RTCPeerConnection(null);
-            PCLookup[PCID].onicecandidate = function (event) {
+            connection.rtcPeerConnection = new RTCPeerConnection(null);
+            connection.rtcPeerConnection.onicecandidate = function (event) {
                 console.log('icecandidate event: ', event);
                 if (event.candidate) {
-                    console.log('maybeStart',event.candidate.sdpMLineIndex, event.candidate.sdpMid);
-                    if(SCID === null){console.error('ERROR: SCID IS NULL')}
                     sendMessage({
                         type: 'ice',
                         roomId: roomId,
@@ -239,22 +255,30 @@ function maybeStart(SCID, PCID) {
                         fromDevice: 'desktop',
                         targetDevice: 'desktop',
                         fromUser: myUserId,
-                        targetUser: SCIDLookup[SCID],
-                        SCID: SCID,
-                        PCID: PCID,
+                        targetUser: connection.userId,
+                        SCID: connection.scid,
+                        PCID: connection.pcid,
                     });
                 } else {
                     console.log('End of candidates.');
                 }
             };
-            PCLookup[PCID].ontrack  = function (event) {
+            connection.rtcPeerConnection.ontrack  = function (event) {
                 console.log('Remote streams added.');
                 console.log(event.streams);
                 allRemoteStreams.push(event.streams);
-                remoteStream = event.streams[0];
-                remoteVideoDirect.srcObject = remoteStream;
+                connection.remoteStream = event.streams[0];
+                if(connection.pcid === 0){
+
+                    let video = document.createElement("video");
+                    video.setAttribute('autoplay','');
+                    video.setAttribute('playsinline','');
+                    video.setAttribute('controls','');
+                    video.srcObject = event.streams[0];
+                    videosElement.appendChild(video);
+                }
             };
-            PCLookup[PCID].onremovestream = function (event) {
+            connection.rtcPeerConnection.onremovestream = function (event) {
                 console.log('Remote stream removed. Event: ', event);
             };
 
@@ -264,28 +288,29 @@ function maybeStart(SCID, PCID) {
             alert('Cannot create RTCPeerConnection object.');
             return;
         }
-        if (isInitiator){
-            dataChannelSend = PCLookup[PCID].createDataChannel('__FOOBAR_DATA_CHANNEL_NAME_DIRECT__');
+        if (connection.isInitiator){
+            dataChannelSend = connection.rtcPeerConnection.createDataChannel('__FOOBAR_DATA_CHANNEL_NAME_DIRECT__');
             dataChannelSend.onopen = onSendChannelStateChangeDirect;
             dataChannelSend.onclose = onSendChannelStateChangeDirect;
         }
         else{
-            PCLookup[PCID].ondatachannel = function(event) {
+            connection.rtcPeerConnection.ondatachannel = function(event) {
                 console.log('Receive Channel Callback');
                 dataChannelReceive = event.channel;
                 dataChannelReceive.onmessage = function(event){
-                    console.error('Received Message', event.data);
+                    console.error('Received Message', connection, event.data);
                 };
                 dataChannelReceive.onopen = onReceiveChannelStateChangeDirect;
                 dataChannelReceive.onclose = onReceiveChannelStateChangeDirect;
             };
         }
 
-        isStarted[PCID] = true;
-        console.log('isInitiator', isInitiator);
-        if (isInitiator) {
+        connection.isStarted = true;
+        console.log('connection.isInitiator', connection.isInitiator);
+        if (connection.isInitiator) {
             console.log('Sending offer to peer');
-            PCLookup[PCID].createOffer(offerOptions).then(setLocalAndSendMessage, handleCreateOfferError);
+            connection.rtcPeerConnection.createOffer(offerOptions).then(
+                function(sdp){setLocalAndSendMessage(sdp, connection)}, handleCreateOfferError);
         }
     }
 }
@@ -308,8 +333,8 @@ function handleCreateOfferError(event) {
     console.log('createOffer() error: ', event);
 }
 
-function setLocalAndSendMessage(sessionDescription,pcid) {
-    PCLookup[pcid].setLocalDescription(sessionDescription);
+function setLocalAndSendMessage(sessionDescription, connection) {
+    connection.rtcPeerConnection.setLocalDescription(sessionDescription);
     let sessionDescriptionMessage = {
         type: sessionDescription.type,
         roomId: roomId,
@@ -317,19 +342,18 @@ function setLocalAndSendMessage(sessionDescription,pcid) {
         fromDevice: 'desktop',
         targetDevice: 'desktop',
         fromUser: myUserId,
-        targetUser: SCIDLookup[globSCID],
-        SCID: globSCID,
-        PCID: pcid,
+        targetUser: connection.userId,
+        SCID: connection.scid,
+        PCID: connection.pcid,
     };
     console.log('setLocalAndSendMessage sending message', sessionDescriptionMessage);
     sendMessage(sessionDescriptionMessage);
 }
 
-function doAnswer(pcid) {
+function doAnswer(connection) {
     console.log('Sending answer to peer.');
-    PCLookup[pcid].createAnswer().then(
-        function(sdp){
-        setLocalAndSendMessage(sdp, pcid)},
+    connection.rtcPeerConnection.createAnswer().then(
+        function(sdp){setLocalAndSendMessage(sdp, connection)},
         onCreateSessionDescriptionError
     );
 }
