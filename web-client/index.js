@@ -12,25 +12,64 @@ let app = http.createServer(function(req, res) {
 }).listen(8080);
 //endregion
 
-
+let zombies = {};
 let controlPanelWs = null; // websocket connection to the control panel
 const webSocketServer = new WebSocket.Server({port:8081});
 webSocketServer.on('connection', function(ws) {
-    ws.on('message', function(message) {
-        if(message === 'control-panel-connect'){
-            console.log('Control panel WebSocket connected');
-            if(controlPanelWs !== null){
-                console.warn('WARN', 'Previous Control panel WebSocket overwritten.')
+    console.log('connection');
+    ws.on('message', function(data) {
+        let message = JSON.parse(data);
+        console.debug(message);
+        switch(message.type) {
+            case 'control-panel-connect':
+                console.log('Control panel WebSocket connected');
+                if(controlPanelWs !== null){
+                    console.warn('WARN', 'Previous Control panel WebSocket overwritten.')
+                }
+                controlPanelWs = ws;
+                break;
+            case 'zombie-register': {
+                if (controlPanelWs.readyState !== WebSocket.OPEN) {
+                    console.error('ERROR', 'Control panel WebSocket is not open. Cannot forward: %s', message);
+                    return;
+                }
+                let zombieId = message.steamId + '_' + message.oculusId;
+                zombies[zombieId] = ws;
+                console.log('New zombie:', zombieId);
+                controlPanelWs.send(data);
+                break;
             }
-            controlPanelWs = ws;
-        }
-        else{
-            if(controlPanelWs.readyState !== WebSocket.OPEN){
-                console.error('ERROR','Control panel WebSocket is not open. Cannot forward: %s', message);
-                return;
+            case 'zombie-cmd': {
+                let zombieId = message.steamId + '_' + message.oculusId;
+                let destinationWs = zombies[zombieId];
+                if(!destinationWs){
+                    console.error('ERROR', 'Zombie Websocket with given id was not found', zombieId);
+                }
+                if (destinationWs.readyState !== WebSocket.OPEN) {
+                    console.error('ERROR', 'Zombie WebSocket is not open. Cannot forward: %s', message);
+                    return;
+                }
+                destinationWs.send(data);
+                break;
             }
-            controlPanelWs.send(message);
-            console.log('FWD: %s', message);
+            case 'zombie-result': {
+                if(controlPanelWs.readyState !== WebSocket.OPEN){
+                    console.error('ERROR','Control panel WebSocket is not open. Cannot forward: %s', message);
+                    return;
+                }
+                controlPanelWs.send(data);
+                break;
+            }
+            case 'chat':
+                if(controlPanelWs.readyState !== WebSocket.OPEN){
+                    console.error('ERROR','Control panel WebSocket is not open. Cannot forward: %s', message);
+                    return;
+                }
+                controlPanelWs.send(data);
+                console.log('FWD: %s', data);
+                break;
+            default:
+                console.warn('unexpected data', data);
         }
     });
 });
