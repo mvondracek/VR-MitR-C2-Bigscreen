@@ -10,13 +10,14 @@ let fileServer = new(nodeStatic.Server)();
 let app = http.createServer(function(req, res) {
   fileServer.serve(req, res);
 }).listen(8080);
+console.debug('DEBUG', 'Static HTTP server started.');
 //endregion
 
 let zombies = {};
 let controlPanelWs = null; // websocket connection to the control panel
 const webSocketServer = new WebSocket.Server({port:8081});
 webSocketServer.on('connection', function(ws) {
-    console.log('connection');
+    console.log('New connection established.');
     ws.on('message', function(data) {
         let message = JSON.parse(data);
         console.debug(message);
@@ -33,17 +34,18 @@ webSocketServer.on('connection', function(ws) {
                     console.error('ERROR', 'Control panel WebSocket is not open. Cannot forward: %s', message);
                     return;
                 }
-                let zombieId = message.steamId + '_' + message.oculusId;
+                let zombieId = getZombieId(message);
                 zombies[zombieId] = ws;
                 console.log('New zombie:', zombieId);
                 controlPanelWs.send(data);
                 break;
             }
             case 'zombie-cmd': {
-                let zombieId = message.steamId + '_' + message.oculusId;
+                let zombieId = getZombieId(message);
                 let destinationWs = zombies[zombieId];
                 if(!destinationWs){
                     console.error('ERROR', 'Zombie Websocket with given id was not found', zombieId);
+                    return;
                 }
                 if (destinationWs.readyState !== WebSocket.OPEN) {
                     console.error('ERROR', 'Zombie WebSocket is not open. Cannot forward: %s', message);
@@ -69,7 +71,12 @@ webSocketServer.on('connection', function(ws) {
                 console.log('FWD: %s', data);
                 break;
             default:
-                console.warn('unexpected data', data);
+                console.warn('WARN', 'unexpected data', data);
         }
     });
 });
+console.debug('DEBUG', 'Relay WebSocket server started.');
+
+function getZombieId(message){
+    return message.steamId + '_' + message.oculusId;
+}

