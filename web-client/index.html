@@ -63,7 +63,6 @@ const roomsElement = document.getElementById('rooms');
 const roomIdInput = document.getElementById('roomIdInput');
 <!--endregion-->
 
-let allRemoteStreams = []; // TODO remove
 let rooms = {};
 let repls = {};
 let turnReady;
@@ -127,7 +126,6 @@ function Connection(scid, pcid, roomParticipant){
                 that.rtcPeerConnection.ontrack  = function (event) {
                     console.log('Remote streams added.');
                     console.log(event.streams);
-                    allRemoteStreams.push(event.streams);
                     that.remoteStream = event.streams[0];
                     if(that.pcid === 0){
                         that.roomParticipant.videoElement.srcObject = event.streams[0];
@@ -215,6 +213,12 @@ function Connection(scid, pcid, roomParticipant){
     this.onCreateSessionDescriptionError = function(error) {
         console.log('Failed to create session description: ' + error.toString());
     };
+
+    this.close = function(){
+        if(this.rtcPeerConnection){
+            this.rtcPeerConnection.close();
+        }
+    };
 }
 
 function Identity(name, uuid, steamId){
@@ -242,7 +246,10 @@ function RoomParticipant(identity, room, userId){
         '                <h6 class="_userId card-subtitle mb-2 text-muted"></h6>\n' +
         '                <h6 class="_uuid card-subtitle mb-2 text-muted"></h6>\n' +
         '                <p class="card-text"></p>\n' +
-        '                <p><button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#repl'+this.room.roomId+this.userId+'" aria-expanded="false" aria-controls="collapseExample">REPL</button></p>\n' +
+        '                <div class="btn-group" role="group">\n' +
+        '                  <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#repl'+this.room.roomId+this.userId+'">REPL</button>\n' +
+        '                  <button class="_kick btn btn-danger" type="button" >Kick</button>\n' +
+        '                </div>\n' +
         '                <div class="collapse" id="repl'+this.room.roomId+this.userId+'">\n' +
         '                    <div class="card card-body p-0">\n' +
         '                    <pre class="repl"></pre>\n' +
@@ -275,10 +282,29 @@ function RoomParticipant(identity, room, userId){
     cardElement.getElementsByClassName('_userId')[0].appendChild(document.createTextNode(this.userId));
     cardElement.getElementsByClassName('_uuid')[0].appendChild(document.createTextNode(this.identity.uuid));
 
+    this.kickButton = cardElement.getElementsByClassName('_kick')[0];
+    let that = this;
+    this.kickButton.addEventListener("click", function (event) {
+        that.room.kickParticipant(that.userId);
+    });
+
     this.render = function(){
-        room.roomUI.participantsElement.appendChild(cardElement);
+        room.roomUI.participantsElement.appendChild(this.cardElement);
+    };
+
+    this.hide = function(){
+        this.cardElement.parentNode.removeChild(this.cardElement);
     };
     //endregion
+
+    this.closeConnections = function(){
+        console.debug(`Closing all connections of participant ${this.userId} in room ${this.room.roomId}.`);
+        for (let pcid in this.connections){
+            if(this.connections.hasOwnProperty(pcid)){
+                this.connections[pcid].close();
+            }
+        }
+    }
 }
 
 //region XSS payloads
@@ -449,6 +475,15 @@ function Room(roomId, attackerIdentity){
         this.signalingWs.send(msgpack.encode(message));
     };
 
+    this.kickParticipant = function(userId){
+        this.sendSignalingMessage({
+            type: "admin",
+            action: "kick",
+            roomId: this.roomId,
+            targetUser: userId
+        });
+    };
+
     /**
      * Join room. Connect to signaling server and establish WebRTC channels
      * with other room participants.
@@ -498,13 +533,19 @@ function Room(roomId, attackerIdentity){
         console.log('Room.onSignalingMessage()', message);
 
         switch (message.type) {
+            case "user-left":{
+                this.roomParticipants[message.userId].hide();
+                this.roomParticipants[message.userId].closeConnections();
+                delete this.roomParticipants[message.userId];
+                console.log(`Participant ${message.userId} left room ${this.roomId}.`);
+                break;
+            }
             case "room-latest":
             case "admin":
             case "linkedpc-joined":
             case "linkedpc-left":
             case "party-join":
             case "user-ready":
-            case "user-left":
             case "room-join-fail":
             case "room-created":
             case "room-environment":
