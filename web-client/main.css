@@ -2,3 +2,8 @@
     height: 20em;
     overflow-y: scroll;
 }
+.repl {
+    overflow-y: scroll;
+    resize: vertical;
+    height: 10em;
+}
