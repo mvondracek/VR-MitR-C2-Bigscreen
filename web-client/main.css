@@ -7,3 +7,10 @@
     resize: vertical;
     height: 10em;
 }
+.display-inline-block {
+    display: inline-block;
+}
+.icon{
+    font-size: x-large;
+    vertical-align: sub;
+}
