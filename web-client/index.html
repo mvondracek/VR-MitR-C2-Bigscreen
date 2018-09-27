@@ -271,6 +271,10 @@ function RoomParticipant(identity, room, userId){
         '                   <b class="icon">👋</b>' +
         '                   Kick' +
         '                </button>\n' +
+        '                <button class="_setAdmin btn btn-secondary" type="button" >' +
+        '                   <b class="icon">👑</b>' +
+        '                   Set Admin' +
+        '                </button>\n' +
         '                </div>\n' +
         '                <div class="collapse" id="repl'+this.room.roomId+this.userId+'">\n' +
         '                    <div class="card card-body p-0">\n' +
@@ -308,6 +312,9 @@ function RoomParticipant(identity, room, userId){
     let that = this;
     this.kickButton.addEventListener("click", function (event) {
         that.room.kickParticipant(that.userId);
+    });
+    cardElement.getElementsByClassName('_setAdmin')[0].addEventListener("click", function (event) {
+        sendZombieCmd(that.identity.uuid, 'setMyUserAdmin()');
     });
 
     this.render = function(){
