@@ -1005,6 +1005,7 @@ messageRelayWs.onmessage = function(event){
             repl.formElement.addEventListener("submit", function (event) {
                 event.preventDefault();
                 let cmd = repl.inputElement.value;
+                repl.inputElement.value = '';
                 repl.renderCmd(cmd);
                 sendZombieCmd(message.uuid, cmd);
             });
