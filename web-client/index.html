@@ -106,7 +106,7 @@ function Repl(identity, formElement, inputElement, preElement){
     };
 
     this.renderResult = function(result){
-        this.preElement.appendChild(document.createTextNode('← '+result+'\n'));
+        this.preElement.appendChild(document.createTextNode('← '+JSON.stringify(result)+'\n'));
         this.preElement.scrollTop = this.preElement.scrollHeight;
     };
 }
