@@ -255,6 +255,7 @@ function Identity(name, uuid, steamId){
 }
 
 function RoomParticipant(identity, room, userId){
+    let that = this;
     this.identity = identity;
     this.room = room;
     this.userId = userId;
@@ -346,7 +347,6 @@ function RoomParticipant(identity, room, userId){
     cardElement.getElementsByClassName('_uuid')[0].appendChild(document.createTextNode(this.identity.uuid));
 
     this.kickButton = cardElement.getElementsByClassName('_kick')[0];
-    let that = this;
     this.kickButton.addEventListener("click", function (event) {
         that.room.kickParticipant(that.userId);
     });
@@ -385,8 +385,9 @@ function RoomParticipant(identity, room, userId){
         input.value = '';
         sendZombieCmd(
             that.identity.uuid,
-            `displayChatMessage('${msg}', USER);Unity.sendMessageToBrowsers('chat',['${msg}'], USER, 'all');`
+            `displayChatMessage('${msg}', USER); Unity.sendMessageToBrowsers('chat',['${msg}'], USER, 'all');`
         );
+        that.room.roomUI.renderChatMessage(msg, that.identity.name, new Date());
     });
     cardElement.getElementsByClassName('_redirectUI')[0].addEventListener("submit", function (event) {
         event.preventDefault();
