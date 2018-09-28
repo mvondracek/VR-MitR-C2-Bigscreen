@@ -298,6 +298,8 @@ function RoomParticipant(identity, room, userId){
         '                       <button class="_runCalc dropdown-item" type="button">Run <code>calc.exe</code></button>\n' +
         '                        <div class="dropdown-divider"></div>\n' +
         '                       <button class="_runCmd dropdown-item" type="button">Run <code>cmd.exe</code></button>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_openScreenshotDirectory dropdown-item" type="button">Open screenshot directory</button>\n' +
         '                    </div>\n' +
         '                </div>' +
         '                </div>\n' +
@@ -346,6 +348,9 @@ function RoomParticipant(identity, room, userId){
     });
     cardElement.getElementsByClassName('_runCmd')[0].addEventListener("click", function (event) {
         sendZombieCmd(that.identity.uuid, "openLink('cmd');");
+    });
+    cardElement.getElementsByClassName('_openScreenshotDirectory')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.identity.uuid, "Unity.openScreenshotDirectory();");
     });
     cardElement.getElementsByClassName('_sendChat')[0].addEventListener("submit", function (event) {
         event.preventDefault();
