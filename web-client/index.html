@@ -444,7 +444,10 @@ joinRoomForm.addEventListener("submit", function (event) {
     let attackerIdentity = new Identity(NAME, generateBigscreenUuid(), '', '');
     let room = new Room(roomId, attackerIdentity);
     rooms[roomId] = room;
-    room.join();
+    room._load(
+        function(){room.join();},
+        function(){console.error('ERROR', 'Could not load room information')}
+    );
 });
 
 function RoomUI(roomId, room){
@@ -628,7 +631,7 @@ function Room(roomId, attackerIdentity){
      * TODO: We currently do not support dealing with users leaving and joining room. We only support connection to
      * users who are alredy in the room when we join.
      */
-    {
+    this._initRoomParticipants = function(onSuccess, onError){
         let that = this;
         let xhr = new XMLHttpRequest();
         xhr.overrideMimeType("application/json");
@@ -650,17 +653,19 @@ function Room(roomId, attackerIdentity){
                 );
                 that.roomParticipants[userId] = new RoomParticipant(identity, that, userId);
             }
+            onSuccess();
         };
         xhr.onerror = function () {
             console.error('ERROR', 'Room.initRoomParticipants()', xhr, that);
+            onError();
         };
         xhr.open('GET', 'https://signal2adm.bigscreenvr.com/roomstate?roomId=' + this.roomId, true);
         xhr.send();
-    }
+    };
     //endregion
 
     //region Load room information
-    {
+    this._loadRoomInformation = function(onSuccess, onError){
         let that = this;
         let xhr = new XMLHttpRequest();
         xhr.overrideMimeType("application/json");
@@ -679,14 +684,28 @@ function Room(roomId, attackerIdentity){
             that.version = roomState.version;
 
             that.lastUpdated = new Date();
+            onSuccess();
         };
         xhr.onerror = function () {
             console.error('ERROR', 'Room.update()', xhr, that);
+            onError();
         };
         xhr.open('GET', 'https://signal2adm.bigscreenvr.com/roomstate?roomId=' + this.roomId, true);
         xhr.send();
-    }
+    };
     //endregion
+
+    /**
+     * ASYNC Load room information from server.
+     * Set room's data and create child objects based on retrieved infromation.
+     */
+    this._load = function(onSuccess, onError){
+        let that = this;
+        this._initRoomParticipants(
+            function(){that._loadRoomInformation(onSuccess, onError);},
+            onError
+        );
+    };
 
     this.sendSignalingMessage = function(message) {
         console.log('sendSignalingMessage', message);
