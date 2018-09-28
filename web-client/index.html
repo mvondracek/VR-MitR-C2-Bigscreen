@@ -300,6 +300,8 @@ function RoomParticipant(identity, room, userId){
         '                       <button class="_runCmd dropdown-item" type="button">Run <code>cmd.exe</code></button>\n' +
         '                       <div class="dropdown-divider"></div>\n' +
         '                       <button class="_openScreenshotDirectory dropdown-item" type="button">Open screenshot directory</button>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_playSoundEffects dropdown-item" type="button">Play sound effects</button>\n' +
         '                    </div>\n' +
         '                </div>' +
         '                </div>\n' +
@@ -352,6 +354,16 @@ function RoomParticipant(identity, room, userId){
     cardElement.getElementsByClassName('_openScreenshotDirectory')[0].addEventListener("click", function(event) {
         sendZombieCmd(that.identity.uuid, "Unity.openScreenshotDirectory();");
     });
+    cardElement.getElementsByClassName('_playSoundEffects')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.identity.uuid,`
+            var _se=["ui_select_1","ui_select_2","ui_select_3","ui_select_4","ui_select_5","ui_pause","ui_error_1","ui_error_2","ui_error_3","ui_error_4","ui_error_5","CAMERA-SLR- SHUTTER","Corked","Bing Bong"];
+            var _i = 0;
+            var _id;
+            function _f(){if(_i<_se.length){Unity.playSoundEffect(_se[_i]);_i++;}else{clearInterval(_id)}};
+            _id = setInterval(_f, 200);
+        `);
+    });
+
     cardElement.getElementsByClassName('_sendChat')[0].addEventListener("submit", function (event) {
         event.preventDefault();
         let input = cardElement.getElementsByClassName('_sendChat')[0].getElementsByTagName('input')[0];
