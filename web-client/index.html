@@ -272,31 +272,20 @@ function RoomParticipant(identity, room, userId){
         '                <h6 class="_uuid card-subtitle mb-2 text-muted"></h6>\n' +
         '                <p class="card-text"></p>\n' +
         '                <div class="btn-group" role="group">\n' +
-        '                <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#repl'+this.room.roomId+this.userId+'">' +
-        '                   <b class="icon">📡</b>' +
-        '                   REPL</button>\n' +
-        '                <button class="_kick btn btn-danger" type="button" >' +
-        '                   <b class="icon">👋</b>' +
-        '                   Kick' +
-        '                </button>\n' +
-        '                <button class="_setAdmin btn btn-secondary" type="button" >' +
-        '                   <b class="icon">👑</b>' +
-        '                   Admin' +
-        '                </button>\n' +
         '                <div class="btn-group">\n' +
-        '                    <button class="btn btn-secondary dropdown-toggle" type="button" data-toggle="dropdown">\n' +
+        '                    <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">\n' +
         '                        <b class="icon">🤖</b>\n' +
         '                        Control\n' +
         '                    </button>\n' +
         '                    <div class="dropdown-menu">\n' +
-        '                        <form class="_redirectUI form-inline m-1">\n' +
+        '                        <form class="_redirectUI m-1">\n' +
         '                            <input type="text" name="redirectUI" class="form-control" placeholder="http://example.com/">\n' +
-        '                            <button type="submit" class="btn btn-primary">Redirect UI</button>\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Redirect UI</button>\n' +
         '                        </form>\n' +
         '                        <div class="dropdown-divider"></div>\n' +
-        '                        <form class="_sendChat form-inline m-1">\n' +
+        '                        <form class="_sendChat m-1">\n' +
         '                            <input type="text" name="sendChat" class="form-control" placeholder="chat message">\n' +
-        '                            <button type="submit" class="btn btn-primary">Send chat</button>\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Send chat</button>\n' +
         '                        </form>\n' +
         '                        <div class="dropdown-divider"></div>\n' +
         '                       <button class="_runCalc dropdown-item" type="button">Run <code>calc.exe</code></button>\n' +
@@ -312,6 +301,17 @@ function RoomParticipant(identity, room, userId){
         '                       <button class="_exitApp dropdown-item" type="button">Kill Bigscreen app</button>\n' +
         '                    </div>\n' +
         '                </div>' +
+        '                <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#repl'+this.room.roomId+this.userId+'">' +
+        '                   <b class="icon">📡</b>' +
+        '                   REPL</button>\n' +
+        '                <button class="_setAdmin btn btn-secondary" type="button" >' +
+        '                   <b class="icon">👑</b>' +
+        '                   Admin' +
+        '                </button>\n' +
+        '                <button class="_kick btn btn-danger" type="button" >' +
+        '                   <b class="icon">👋</b>' +
+        '                   Kick' +
+        '                </button>\n' +
         '                </div>\n' +
         '                <div class="collapse" id="repl'+this.room.roomId+this.userId+'">\n' +
         '                    <div class="card card-body p-0">\n' +
