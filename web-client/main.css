@@ -14,3 +14,14 @@
     font-size: x-large;
     vertical-align: sub;
 }
+.roomList {
+    height: 15em;
+    overflow-y: scroll;
+}
+.roomList-footer {
+    height: 5em;
+}
+.zombieList {
+    height: 20em;
+    overflow-y: scroll;
+}

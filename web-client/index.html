@@ -49,6 +49,51 @@
             </form>
         </div>
     </div>
+    <div class="row"><div class="col-sm">
+        <div class="card"><div class="card-body">
+            <div class="card-deck">
+                <div class="card text-center" id="publicRooms">
+                    <div class="card-header">Public rooms</div>
+                    <ul class="list-group list-group-flush roomList"></ul>
+                    <div class="card-footer text-muted roomList-footer">
+                       <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="" id="publicRoomsAutorefresh">
+                            <label class="form-check-label" for="publicRoomsAutorefresh">autorefresh</label>
+                        </div>
+                        last update <time></time>
+                    </div>
+                </div>
+                <div class="card text-center">
+                    <div class="card-header">Discovered private rooms</div>
+                    <ul class="list-group list-group-flush roomList"></ul>
+                    <div class="card-footer text-muted roomList-footer">
+                       <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="" id="privateRoomsAutorefresh">
+                            <label class="form-check-label" for="privateRoomsAutorefresh">autorefresh</label>
+                        </div>
+                        last update <time></time>
+                    </div>
+                </div>
+                <div class="card text-center">
+                    <div class="card-header">Zombies</div>
+                    <ul class="list-group list-group-flush zombieList">
+                        <li class="list-group-item">zombie</li>
+                        <li class="list-group-item">zombie</li>
+                        <li class="list-group-item">zombie</li>
+                        <li class="list-group-item">zombie</li>
+                        <li class="list-group-item">zombie</li>
+                        <li class="list-group-item">zombie</li>
+                        <li class="list-group-item">zombie</li>
+                        <li class="list-group-item">zombie</li>
+                        <li class="list-group-item">zombie</li>
+                        <li class="list-group-item">zombie</li>
+                        <li class="list-group-item">zombie</li>
+                        <li class="list-group-item">zombie</li>
+                    </ul>
+                </div>
+            </div>
+        </div></div>
+    </div></div>
 
 
 
@@ -458,7 +503,7 @@ function RoomUI(roomId, room){
     roomCardTempalte.innerHTML =
         '<div class="card">\n' +
         '    <div class="card-header">' +
-        '       <span></span>' +
+        '       <code></code>' +
         '       <div class="dropdown display-inline-block">\n' +
         '           <button class="btn btn-info dropdown-toggle" type="button" data-toggle="dropdown">' +
         '               <b class="icon">⚙</b>' +
@@ -518,7 +563,7 @@ function RoomUI(roomId, room){
         that.room.updateLockSettings(locks);
     });
 
-    this.roomIdElement = this.roomCardElement.querySelector('.card-header span');
+    this.roomIdElement = this.roomCardElement.querySelector('.card-header code');
     this.roomIdElement.appendChild(document.createTextNode(roomId));
 
     this.chatBodyElement = this.roomCardElement.querySelector('div div div div div.card-body');
@@ -1021,6 +1066,120 @@ messageRelayWs.onmessage = function(event){
             console.warn('messageRelayWs unexpected message');
     }
 };
+
+
+function PublicRooms(){
+    let that = this;
+    this.sendSignalingMessage = function(message) {
+        this.signalingWs.send(msgpack.encode(message));
+    };
+    this.onSignalingMessage = function(event){
+        let message = msgpack.decode(new Uint8Array(event.data));
+        if(message.type === 'room-latest'){
+            let rooms = message.rooms;
+            that.publicRoomsUI.hideAllRooms();
+            rooms.forEach(function(room){
+                that.publicRoomsUI.addRoom(room);
+            });
+        }
+        else{
+            console.warn('WARN', 'PublicRooms.onSignalingMessage: Unexpected message:', message);
+        }
+    };
+
+    this.publicRoomsUI = new PublicRoomsUI(this);
+    this.intervalId = null;
+
+    this.signalingWs = new WebSocket(bigscreenSignalUrl);
+    this.signalingWs.binaryType = 'arraybuffer';
+    this.signalingWs.onopen = function (event) {
+        that.sendSignalingMessage({type: 'register-desktop'});
+    };
+    this.signalingWs.onclose = function (event) {
+        console.debug('PublicRoomson.signalingWs.onclose', event);
+    };
+    this.signalingWs.onmessage = function (event) {
+        that.onSignalingMessage(event);
+    };
+    this.signalingWs.onerror = function (event) {
+        console.error('ERROR', 'PublicRooms.signalingWs.onerror', event);
+
+    };
+
+    this.startPeriodicUpdates = function(){
+        if(this.intervalId !== null){
+            console.error('ERROR', 'Periodic updates already started.');
+            return;
+        }
+
+        that.sendSignalingMessage({type: "room-latest"}); // update now
+        this.intervalId = setInterval(function(){
+            that.sendSignalingMessage({type: "room-latest"});
+        },5000); // NOTE: original Bigscreen application uses interval 5000
+    };
+
+    this.stopPeriodicUpdates = function(){
+        if(this.intervalId === null){
+            console.error('ERROR', 'Cannot stop. Periodic updates are not running.');
+            return;
+        }
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+    };
+
+    this.togglePeriodicUpdates = function(){
+        if(this.intervalId === null){
+            this.startPeriodicUpdates();
+        }
+        else{
+            this.stopPeriodicUpdates();
+        }
+    }
+}
+
+function PublicRoomsUI(publicRooms){
+    // TODO Maybe dynamically insert html
+    let that = this;
+    this.publicRooms = publicRooms;
+    this.publicRoomsCardElement = document.getElementById('publicRooms');
+    this.publicRoomsListElement = this.publicRoomsCardElement.getElementsByTagName('ul')[0];
+    this.updatedTimeElement = this.publicRoomsCardElement.querySelector('.card-footer time');
+    this.autorefreshInput = this.publicRoomsCardElement.querySelector('.card-footer .form-check input');
+    this.autorefreshInput.checked = false;
+
+    this.hideAllRooms = function(){
+        this.publicRoomsListElement.innerHTML = '';
+    };
+
+    this.addRoom = function(room){
+        let roomElement = document.createElement('li');
+        roomElement.classList.add('list-group-item');
+        let nameElement = document.createElement('b');
+        nameElement.appendChild(document.createTextNode(room.name));
+        roomElement.appendChild(nameElement);
+        roomElement.appendChild(document.createTextNode(' · ' + room.description));
+        roomElement.appendChild(document.createElement('br'));
+        let roomIdElement = document.createElement('code');
+        roomIdElement.appendChild(document.createTextNode(room.roomId));
+        roomElement.appendChild(roomIdElement);
+        roomElement.appendChild(document.createTextNode(' (' + room.participants + '/' + room.size + ')'));
+        this.publicRoomsListElement.appendChild(roomElement);
+        this.updateFooter(); // TODO maybe update after all added rooms
+    };
+
+    this.updateFooter = function(){
+        this.updatedTimeElement.innerHTML = '';
+        this.updatedTimeElement.appendChild(
+            document.createTextNode((new Date).toLocaleTimeString())
+        );
+    };
+
+    this.autorefreshInput.addEventListener("click", function (event) {
+        that.publicRooms.togglePeriodicUpdates();
+    });
+}
+
+let publicRooms = new PublicRooms();
 
 </script>
 </body>
