@@ -25,3 +25,7 @@
     height: 20em;
     overflow-y: scroll;
 }
+.roomId {
+    font-family: monospace;
+    font-size: 150%;
+}

