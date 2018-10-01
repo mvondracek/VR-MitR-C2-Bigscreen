@@ -528,6 +528,10 @@ function RoomUI(roomId, room){
         '               </button>\n' +
         '           </div>\n' +
         '       </div>' +
+        '       <button class="btn btn-danger _leave" type="button">' +
+        '           <b class="icon">👋</b>' +
+        '           Leave' +
+        '       </button>\n' +
         '    </div>\n' +
         '    <div class="card-body">\n' +
         '        <div class="row">\n' +
@@ -565,6 +569,11 @@ function RoomUI(roomId, room){
         let locks = that.room.locks;
         locks.lockDrawing = ! locks.lockDrawing;
         that.room.updateLockSettings(locks);
+    });
+
+    this.roomCardElement.querySelector('._leave').addEventListener("click", function (event) {
+        that.room.leave();
+        delete rooms[that.room.roomId];
     });
 
     this.roomIdElement = this.roomCardElement.querySelector('.card-header span.roomId');
@@ -628,6 +637,10 @@ function RoomUI(roomId, room){
 
     this.render = function(parentElement){
         parentElement.appendChild(this.roomCardElement);
+    };
+
+    this.hide = function(){
+        this.roomCardElement.parentNode.removeChild(this.roomCardElement);
     };
 
     this.renderChatMessage = function(message, sender, date){
@@ -829,6 +842,20 @@ function Room(roomId, attackerIdentity){
         this.signalingWs.onerror = function (event) {
             console.log('onError event', event);
         };
+    };
+
+    this.leave = function(){
+        for (let userId in this.roomParticipants){
+            if(this.roomParticipants.hasOwnProperty(userId)){
+                this.roomParticipants[userId].hide();
+                this.roomParticipants[userId].closeConnections();
+                delete this.roomParticipants[userId];
+            }
+        }
+        this.roomUI.hide();
+        this.sendSignalingMessage({type: "room-leave"});
+        this.signalingWs.close();
+        this.signalingWs = null;
     };
 
     this.onSignalingMessage = function(event) {
@@ -1044,7 +1071,9 @@ messageRelayWs.onmessage = function(event){
     console.log("messageRelayWs received:", message);
     switch (message.type) {
         case 'chat':
-            rooms[message.roomId].roomUI.renderChatMessage(message.message, message.name, new Date());
+            if(rooms[message.roomId]) {
+                rooms[message.roomId].roomUI.renderChatMessage(message.message, message.name, new Date());
+            }
             break;
         case 'room-discovered':
             discoveredRoomsManager.addRoom(message.roomId);
