@@ -1068,7 +1068,7 @@ messageRelayWs.onmessage = function(event){
 };
 
 
-function PublicRooms(){
+function PublicRoomsManager(){
     let that = this;
     this.sendSignalingMessage = function(message) {
         this.signalingWs.send(msgpack.encode(message));
@@ -1076,14 +1076,11 @@ function PublicRooms(){
     this.onSignalingMessage = function(event){
         let message = msgpack.decode(new Uint8Array(event.data));
         if(message.type === 'room-latest'){
-            let rooms = message.rooms;
             that.publicRoomsUI.hideAllRooms();
-            rooms.forEach(function(room){
-                that.publicRoomsUI.addRoom(room);
-            });
+            that.publicRoomsUI.addAllRooms(message.rooms);
         }
         else{
-            console.warn('WARN', 'PublicRooms.onSignalingMessage: Unexpected message:', message);
+            console.warn('WARN', 'PublicRoomsManager.onSignalingMessage: Unexpected message:', message);
         }
     };
 
@@ -1102,7 +1099,7 @@ function PublicRooms(){
         that.onSignalingMessage(event);
     };
     this.signalingWs.onerror = function (event) {
-        console.error('ERROR', 'PublicRooms.signalingWs.onerror', event);
+        console.error('ERROR', 'PublicRoomsManager.signalingWs.onerror', event);
 
     };
 
@@ -1151,20 +1148,23 @@ function PublicRoomsUI(publicRooms){
         this.publicRoomsListElement.innerHTML = '';
     };
 
-    this.addRoom = function(room){
-        let roomElement = document.createElement('li');
-        roomElement.classList.add('list-group-item');
-        let nameElement = document.createElement('b');
-        nameElement.appendChild(document.createTextNode(room.name));
-        roomElement.appendChild(nameElement);
-        roomElement.appendChild(document.createTextNode(' · ' + room.description));
-        roomElement.appendChild(document.createElement('br'));
-        let roomIdElement = document.createElement('code');
-        roomIdElement.appendChild(document.createTextNode(room.roomId));
-        roomElement.appendChild(roomIdElement);
-        roomElement.appendChild(document.createTextNode(' (' + room.participants + '/' + room.size + ')'));
-        this.publicRoomsListElement.appendChild(roomElement);
-        this.updateFooter(); // TODO maybe update after all added rooms
+    this.addAllRooms = function(rooms){
+        let that = this;
+        rooms.forEach(function(room){
+            let roomElement = document.createElement('li');
+            roomElement.classList.add('list-group-item');
+            let nameElement = document.createElement('b');
+            nameElement.appendChild(document.createTextNode(room.name));
+            roomElement.appendChild(nameElement);
+            roomElement.appendChild(document.createTextNode(' · ' + room.description));
+            roomElement.appendChild(document.createElement('br'));
+            let roomIdElement = document.createElement('code');
+            roomIdElement.appendChild(document.createTextNode(room.roomId));
+            roomElement.appendChild(roomIdElement);
+            roomElement.appendChild(document.createTextNode(' (' + room.participants + '/' + room.size + ')'));
+            that.publicRoomsListElement.appendChild(roomElement);
+        });
+        this.updateFooter();
     };
 
     this.updateFooter = function(){
@@ -1179,7 +1179,7 @@ function PublicRoomsUI(publicRooms){
     });
 }
 
-let publicRooms = new PublicRooms();
+let publicRooms = new PublicRoomsManager();
 
 </script>
 </body>
