@@ -1069,7 +1069,7 @@ function sendZombieCmd(zombieUuid, cmd){
     }));
 }
 
-var messageRelayWs = new WebSocket('ws://127.0.0.1:8081');
+var messageRelayWs = new WebSocket(relayServer);
 messageRelayWs.onopen = function(){
     messageRelayWs.send(JSON.stringify({type:'control-panel-connect'}));
 };
