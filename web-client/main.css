@@ -27,3 +27,25 @@
     font-family: monospace;
     font-size: 150%;
 }
+.zombie-logs,
+.zombie-chat
+{
+    overflow-y: scroll;
+    height: 200px;
+}
+.zombie-repl {
+    height: 200px;
+}
+.zombie-repl pre {
+    height: 150px;
+    margin: 0;
+    overflow-y: scroll;
+}
+.zombie-repl form div,
+.zombie-repl form div input
+{
+    height: 50px;
+}
+.collapseButton{
+    vertical-align: baseline;
+}
