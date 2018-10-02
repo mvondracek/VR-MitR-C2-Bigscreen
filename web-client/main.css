@@ -49,3 +49,11 @@
 .collapseButton{
     vertical-align: baseline;
 }
+div.zombie-chat div.card-body,
+div.zombie-logs div.card-body {
+    font-family: monospace;
+}
+div.zombie-chat div.card-body p,
+div.zombie-logs div.card-body p {
+    margin:0;
+}

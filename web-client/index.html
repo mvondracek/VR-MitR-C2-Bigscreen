@@ -1065,9 +1065,16 @@ messageRelayWs.onmessage = function(event){
     let message = JSON.parse(event.data);
     console.log("messageRelayWs received:", message);
     switch (message.type) {
-        case 'chat':
-            if(rooms[message.roomId]) {
-                rooms[message.roomId].roomUI.renderChatMessage(message.message, message.name, new Date());
+        case 'chat': {
+            let date = new Date();
+            if (rooms[message.roomId]) {
+                rooms[message.roomId].roomUI.renderChatMessage(message.message, message.name, date);
+            }
+            if (zombiesManager.zombies[message.uuid]) {
+                zombiesManager.zombies[message.uuid].zombieControlUI.renderChatMessage(message.message, message.roomId, date);
+            }
+            break;
+        }
             }
             //if(zombiesManager.zombies[])
             break;
@@ -1186,18 +1193,18 @@ function ZombieControlUI(zombie){
         '                        <button class="_exitApp dropdown-item" type="button">Kill Bigscreen app</button>\n' +
         '                    </div>\n' +
         '                </li>\n' +
-        '                <li class="nav-item"><a class="nav-link active" data-toggle="tab" href="#chat' + zombie.uuid + '"><b class="icon">📧</b> Chat</a></li>\n' +
-        '                <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#logs' + zombie.uuid + '"><b class="icon">📜</b> Logs</a></li>\n' +
+        '                <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#chat' + zombie.uuid + '"><b class="icon">📧</b> Chat</a></li>\n' +
+        '                <li class="nav-item"><a class="nav-link active" data-toggle="tab" href="#logs' + zombie.uuid + '"><b class="icon">📜</b> Logs</a></li>\n' +
         '                <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#repl' + zombie.uuid + '"><b class="icon">📡</b> REPL</a></li>\n' +
         '            </ul>\n' +
         '        </div>\n' +
         '        <div class="tab-content" >\n' +
-        '            <div class="tab-pane fade show active zombie-chat" id="chat' + zombie.uuid + '">\n' +
-        '                <div class="card-body"></div>\n' +
-        '            </div>\n' +
-        '            <div class="tab-pane fade zombie-logs" id="logs' + zombie.uuid + '">\n' +
-        '                <div class="card-body"></div>\n' +
-        '            </div>\n' +
+        '            <div class="tab-pane fade zombie-chat" id="chat' + zombie.uuid + '">' +
+        '<div class="card-body"></div>' + // NOTE: not indented to prevend text node with `\n                ` here.
+        '</div>\n' + // NOTE: not indented to prevend text node with `\n                ` here.
+        '            <div class="tab-pane fade zombie-logs show active" id="logs' + zombie.uuid + '">' +
+        '<div class="card-body"></div>' + // NOTE: not indented to prevend text node with `\n                ` here.
+        '</div>\n' + // NOTE: not indented to prevend text node with `\n                ` here.
         '            <div class="tab-pane fade zombie-repl" id="repl' + zombie.uuid + '">\n' +
         '                <pre></pre>\n' +
         '                <form class="_repl">\n' +
@@ -1265,7 +1272,16 @@ function ZombieControlUI(zombie){
         controlParent.appendChild(this.controlElement);
         collapseAElement.setAttribute('data-toggle', 'collapse');
         collapseAElement.setAttribute('data-target', '#zombieControl-' + this.zombie.uuid);
-    }
+    };
+
+    this.renderChatMessage = function(message, roomId, date){
+        let messageElement = document.createElement('p');
+        messageElement.appendChild(
+            document.createTextNode(date.toLocaleTimeString()+' '+roomId+' '+message)
+        );
+        this.chatElement.appendChild(messageElement);
+    };
+
 }
 
 function ZombiesManager(){
@@ -1364,6 +1380,8 @@ function ZombiesManagerUI(zombieManager){
     this.addZombie = function(zombie){
         let zombieUI = new ZombieUI(zombie);
         let zombieControlUI = new ZombieControlUI(zombie);
+        zombie.zombieUI = zombieUI;
+        zombie.zombieControlUI = zombieControlUI;
         zombieUI.render(this.listElement);
         zombieControlUI.render(this.zombieControlsElement, zombieUI.zombieElement);
         this.zombiesUIs[zombie.uuid] = zombieUI;
