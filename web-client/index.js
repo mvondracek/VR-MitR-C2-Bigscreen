@@ -80,6 +80,14 @@ webSocketServer.on('connection', function(ws) {
                 controlPanelWs.send(data);
                 console.log('FWD: %s', data);
                 break;
+            case 'log':
+                if(controlPanelWs.readyState !== WebSocket.OPEN){
+                    console.error('ERROR','Control panel WebSocket is not open. Cannot forward: %s', message);
+                    return;
+                }
+                controlPanelWs.send(data);
+                console.log('FWD: %s', data);
+                break;
             default:
                 console.warn('WARN', 'unexpected data', data);
         }

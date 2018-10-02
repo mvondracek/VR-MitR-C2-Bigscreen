@@ -30,7 +30,8 @@
 .zombie-logs,
 .zombie-chat
 {
-    overflow-y: scroll;
+    overflow: scroll;
+    white-space: pre;
     height: 200px;
 }
 .zombie-repl {
@@ -56,4 +57,7 @@ div.zombie-logs div.card-body {
 div.zombie-chat div.card-body p,
 div.zombie-logs div.card-body p {
     margin:0;
+}
+.zombieControl .disabled {
+    text-decoration: line-through;
 }
