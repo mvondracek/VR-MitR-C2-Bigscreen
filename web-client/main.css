@@ -62,3 +62,6 @@ div.zombie-logs div.card-body p {
 .zombieControl .disabled {
     text-decoration: line-through;
 }
+body {
+    overflow-y: scroll;
+}

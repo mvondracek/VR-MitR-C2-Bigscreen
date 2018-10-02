@@ -18,34 +18,45 @@
 <body>
 <div class="container-fluid">
     <div class="row">
-        <div class="col-sm">
+        <div class="col-12">
             <h1>Man-in-the-Room Attack <small class="text-muted">Proof of Concept</small></h1>
             <h2>Bigscreen <small class="text-muted"><a href="https://bigscreenvr.com/">https://bigscreenvr.com/</a></small></h2>
             <div class="alert alert-secondary alert-dismissible fade show" role="alert">
                 <p class="h3 alert-heading">Features</p>
                 <ul>
-                    <li>Remote <abbr title="Read–Eval–Print Loop" class="initialism">REPL</abbr> (remote Javascript <code>eval</code>) on victim's machines.</li>
-                    <li>Run program on victim's machine.</li>
-                    <li>Attacker is not visible in VR room. Attacker's username is hidden from <i>Room Preview UI</i> and from <i>Room Participants UI</i>.</li>
-                    <li>Victim's chat is persistently eavesdropped, even if they go to another room.</li>
-                    <li>Remotely kill victim's Bigscreen application.</li>
-                    <li>Play various sound effects.</li>
-                    <li>Force user to send any chat message.</li>
-                    <li>Force user to open screenshot directory.</li>
-                    <li>Set selected user as admin (privilege escalation).</li>
-                    <li>Kick user from room. <i>Only admin should be able to do this.</i></li>
+                    <li><b class="text-danger">Botnet-like group</b> of infected Bigscreen applications that can be controlled by this <b>Command and Control</b> panel.
+                        <ul>
+                            <li>
+                                Remote <abbr title="Read–Eval–Print Loop" class="initialism">REPL</abbr> (remote Javascript <code>eval</code>) on victim's machines.
+                                <b class="text-danger">RCE</b>
+                            </li>
+                            <li>Run program on victim's machine.</li>
+                            <li>Persistently <b>eavesdrop victim's chat</b>, even if they go to another room.</li>
+                            <li>Remotely <b>kill</b> victim's Bigscreen application. <b class="text-danger">Denial-of-service</b></li>
+                            <li>Gather all victim's <b>logs</b>.</li>
+                            <li>Play various sound effects.</li>
+                            <li>Force victim to open screenshot directory.</li>
+                        </ul>
+                    </li>
+                    <li>Attacker can <b>invisibly join</b> any known Bigscreen room. Attacker is not visible in VR. Attacker's username is hidden from <i>Room Preview UI</i> and from <i>Room Participants UI</i>.</li>
+                    <li>Attacker can <b>receive victim's audio and video</b> without victim's knowledge. <b class="text-danger">Eavesdropping</b></li>
+                    <li>Force victim to send any chat message.</li>
+                    <li>Set selected user as admin. <b class="text-danger">Privilege escalation</b></li>
+                    <li><b>Kick</b> user from room. <i>Only admin should be able to do this.</i> <b class="text-danger">Denial-of-service</b></li>
                     <li>Change user's avatar.</li>
-                    <li>Change room's settings (VR locks). <i>Only admin should be able to do this.</i></li>
-                    <li>Redirect Bigscreen's <abbr title="User Interface" class="initialism">UI</abbr> to any webpage.</li>
+                    <li>Change room's settings VR locks. <i>Only admin should be able to do this.</i></li>
+                    <li>Redirect Bigscreen's <abbr title="User Interface" class="initialism">UI</abbr> to any webpage. <b class="text-danger">Phishing</b></li>
                 </ul>
                 <button type="button" class="close" data-dismiss="alert" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
-            <form class="form-inline" id="joinRoomForm">
+        </div>
+        <div class="col-12">
+            <form class="form-inline justify-content-center" id="joinRoomForm">
                 <label class="mb-2 mr-sm-2" for="roomIdInput">Room ID: </label>
-                <input class="mb-2 mr-sm-2 form-control" id="roomIdInput" type="text" placeholder="8we1jdc4" required>
-                <input class="btn btn-outline-primary mb-2 mr-sm-2" type="submit" value="Eavesdrop">
+                <input class="mb-2 mr-sm-2 form-control" name="roomId" id="roomIdInput" type="text" placeholder="room-8we1jdc4" required>
+                <input class="btn btn-primary mb-2 mr-sm-2" type="submit" value="Eavesdrop as invisible user">
             </form>
         </div>
     </div>
