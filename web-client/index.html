@@ -426,9 +426,8 @@ function RoomParticipant(identity, room, userId){
         input.value = '';
         sendZombieCmd(
             that.identity.uuid,
-            `displayChatMessage('${msg}', USER); Unity.sendMessageToBrowsers('chat',['${msg}'], USER, 'all');`
+            `displayChatMessage('${msg}', USER); Unity.sendMessageToBrowsers('chat',['${msg}'], USER, 'all'); var s=new WebSocket('${relayServer}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,uuid:ACCOUNT.uuid,'steamId':mySteamId,'oculusId':myOculusId,message:'${msg}'}));s.close();}`
         );
-        that.room.roomUI.renderChatMessage(msg, that.identity.name, new Date());
     });
     cardElement.getElementsByClassName('_redirectUI')[0].addEventListener("submit", function (event) {
         event.preventDefault();
