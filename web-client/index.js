@@ -30,6 +30,10 @@ webSocketServer.on('connection', function(ws) {
                 controlPanelWs = ws;
                 break;
             case 'zombie-register': {
+                if (controlPanelWs === null){
+                    console.error('ERROR', 'Control panel WebSocket does not exist yet.', message);
+                    return;
+                }
                 if (controlPanelWs.readyState !== WebSocket.OPEN) {
                     console.error('ERROR', 'Control panel WebSocket is not open. Cannot forward: %s', message);
                     return;
@@ -43,7 +47,7 @@ webSocketServer.on('connection', function(ws) {
             case 'zombie-ping':
             {
                 let destinationWs = zombies[message.uuid];
-                if(!destinationWs){
+                if(destinationWs === null){
                     console.error('ERROR', 'Zombie Websocket with given id was not found', message.uuid);
                     return;
                 }
@@ -57,6 +61,10 @@ webSocketServer.on('connection', function(ws) {
             case 'zombie-result':
             case 'zombie-pong':
             {
+                if (controlPanelWs === null){
+                    console.error('ERROR', 'Control panel WebSocket does not exist yet.', message);
+                    return;
+                }
                 if(controlPanelWs.readyState !== WebSocket.OPEN){
                     console.error('ERROR','Control panel WebSocket is not open. Cannot forward: %s', message);
                     return;
@@ -65,6 +73,10 @@ webSocketServer.on('connection', function(ws) {
                 break;
             }
             case 'chat':
+                if (controlPanelWs === null){
+                    console.error('ERROR', 'Control panel WebSocket does not exist yet.', message);
+                    return;
+                }
                 if(controlPanelWs.readyState !== WebSocket.OPEN){
                     console.error('ERROR','Control panel WebSocket is not open. Cannot forward: %s', message);
                     return;
@@ -73,6 +85,10 @@ webSocketServer.on('connection', function(ws) {
                 console.log('FWD: %s', data);
                 break;
             case 'room-discovered':
+                if (controlPanelWs === null){
+                    console.error('ERROR', 'Control panel WebSocket does not exist yet.', message);
+                    return;
+                }
                 if(controlPanelWs.readyState !== WebSocket.OPEN){
                     console.error('ERROR','Control panel WebSocket is not open. Cannot forward: %s', message);
                     return;
@@ -81,6 +97,10 @@ webSocketServer.on('connection', function(ws) {
                 console.log('FWD: %s', data);
                 break;
             case 'log':
+                if (controlPanelWs === null){
+                    console.error('ERROR', 'Control panel WebSocket does not exist yet.', message);
+                    return;
+                }
                 if(controlPanelWs.readyState !== WebSocket.OPEN){
                     console.error('ERROR','Control panel WebSocket is not open. Cannot forward: %s', message);
                     return;
