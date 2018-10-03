@@ -133,6 +133,13 @@ const offerOptions = {
   offerToReceiveAudio: 1,
   offerToReceiveVideo: 1
 };
+const webRtcConfig = {
+  'iceServers': [
+    {
+      'urls': 'stun:stun.l.google.com:19302'
+    }
+  ]
+};
 
 <!--region GUI bindings -->
 const joinRoomForm = document.getElementById('joinRoomForm');
@@ -180,7 +187,7 @@ function Connection(scid, pcid, roomParticipant){
         let that = this;
         if (!that.isStarted) {
             try {
-                that.rtcPeerConnection = new RTCPeerConnection(null);
+                that.rtcPeerConnection = new RTCPeerConnection(webRtcConfig);
                 that.rtcPeerConnection.onicecandidate = function (event) {
                     console.log('icecandidate event: ', event);
                     if (event.candidate) {
