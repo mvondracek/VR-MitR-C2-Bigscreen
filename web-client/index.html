@@ -214,6 +214,9 @@ function Connection(scid, pcid, roomParticipant){
                     if(that.pcid === 0){
                         that.roomParticipant.videoElement.srcObject = event.streams[0];
                     }
+                    else{
+                        that.roomParticipant.audioElement.srcObject = event.streams[0];
+                    }
                 };
                 that.rtcPeerConnection.onremovestream = function (event) {
                     console.log('Remote stream removed. Event: ', event);
@@ -326,6 +329,7 @@ function RoomParticipant(identity, room, userId){
     template.innerHTML = '<div class="col-sm-6">\n' +
         '           <div class="card">\n' +
         '              <video class="card-img-top" autoplay playsinline controls></video>\n' +
+        '              <audio class="card-img-top" autoplay controls></audio>\n' +
         '              <div class="card-body">\n' +
         '                <h5 class="_username card-title"></h5>\n' +
         '                <h6 class="_userId card-subtitle mb-2 text-muted"></h6>\n' +
@@ -395,6 +399,7 @@ function RoomParticipant(identity, room, userId){
     let cardElement = template.content.firstChild;
     this.cardElement = cardElement;
     this.videoElement = cardElement.getElementsByTagName('video')[0];
+    this.audioElement = cardElement.getElementsByTagName('audio')[0];
     roomRepls[this.identity.uuid] = new Repl(
         this.identity,
         cardElement.getElementsByClassName('_repl')[0],
