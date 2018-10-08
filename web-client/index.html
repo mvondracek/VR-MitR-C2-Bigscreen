@@ -421,8 +421,8 @@ function RoomParticipant(identity, room, userId){
         cardElement.getElementsByTagName('pre')[0],
     );
     cardElement.getElementsByClassName('_username')[0].appendChild(document.createTextNode(this.identity.name));
-    cardElement.getElementsByClassName('_userId')[0].appendChild(document.createTextNode(this.userId));
-    cardElement.getElementsByClassName('_uuid')[0].appendChild(document.createTextNode(this.identity.uuid));
+    cardElement.getElementsByClassName('_userId')[0].appendChild(document.createTextNode('UserID: '+this.userId));
+    cardElement.getElementsByClassName('_uuid')[0].appendChild(document.createTextNode('UUID: '+this.identity.uuid));
 
     this.kickButton = cardElement.getElementsByClassName('_kick')[0];
     this.kickButton.addEventListener("click", function (event) {
@@ -542,7 +542,7 @@ function RoomUI(roomId, room){
     this.room = room;
     let roomCardTempalte = document.createElement('template');
     roomCardTempalte.innerHTML =
-        '<div class="card">\n' +
+        '<div class="card my-3">\n' +
         '    <div class="card-header">' +
         '       <span class="roomId"></span>' +
         '       <div class="dropdown display-inline-block">\n' +
