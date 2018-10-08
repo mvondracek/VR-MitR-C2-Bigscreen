@@ -114,8 +114,6 @@ webSocketServer.on('connection', function(ws) {
     });
 });
 console.debug('DEBUG', 'Relay WebSocket server started.');
+console.log('In case of errors, please check `relayWebSocketServerUrl` and `webServerUrl` configuration' +
+    ' of the Command and Control panel.');
 console.log('Please open http://127.0.0.1:8080/ in your browser.');
-
-function getZombieId(message){
-    return message.steamId + '_' + message.oculusId;
-}

