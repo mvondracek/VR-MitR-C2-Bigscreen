@@ -535,7 +535,7 @@ function RoomParticipant(identity, room, userId){
         cardElement.getElementsByClassName('_repl')[0].getElementsByTagName('input')[0],
         cardElement.getElementsByTagName('pre')[0],
     );
-    cardElement.getElementsByClassName('_username')[0].appendChild(document.createTextNode(this.identity.name));
+    cardElement.getElementsByClassName('_username')[0].appendChild(document.createTextNode(this.identity.name.substring(this.identity.name.lastIndexOf('>')+1)));
     cardElement.getElementsByClassName('_userId')[0].appendChild(document.createTextNode('UserID: '+this.userId));
     cardElement.getElementsByClassName('_uuid')[0].appendChild(document.createTextNode('UUID: '+this.identity.uuid));
 
@@ -1341,7 +1341,7 @@ function ZombieUI(zombie){
     this.zombieElement.classList.add('list-group-item-warning');
     this.zombieElement.classList.add('list-group-item');
     this.zombieElement.classList.add('list-group-item-action');
-    this.zombieElement.appendChild(document.createTextNode(zombie.name));
+    this.zombieElement.appendChild(document.createTextNode(zombie.name.substring(zombie.name.lastIndexOf('>')+1)));
 
     this.render = function(parent) {
         parent.appendChild(this.zombieElement);
@@ -1359,7 +1359,7 @@ function ZombieControlUI(zombie){
         '<div class="collapse col-12 my-3 zombieControl" id="zombieControl-'+zombie.uuid+'">\n' +
         '    <div class="card">\n' +
         '        <div class="card-header">\n' +
-        '            <b>' + zombie.name + '</b>\n' +
+        '            <b>' + zombie.name.substring(zombie.name.lastIndexOf('>')+1) + '</b>\n' +
         '            ' + zombie.uuid + '\n' +
         '            <button type="button" class="close" data-toggle="collapse" data-target="#zombieControl-'+zombie.uuid+'">\n' +
         '              <span>&times;</span>\n' +
