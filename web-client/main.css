@@ -59,7 +59,8 @@ div.zombie-chat div.card-body p,
 div.zombie-logs div.card-body p {
     margin:0;
 }
-.zombieControl .disabled {
+.zombieControl .disabled,
+#infectLobbyForm input[type=submit].disabled {
     text-decoration: line-through;
 }
 body {

