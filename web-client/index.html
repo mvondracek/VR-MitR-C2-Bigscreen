@@ -149,19 +149,22 @@ const webRtcConfig = {
   ]
 };
 
-<!--region GUI bindings -->
 //endregion
+
+
+// region GUI bindings
 const joinRoomForm = document.getElementById('joinRoomForm');
 const roomsElement = document.getElementById('rooms');
 const roomIdInput = document.getElementById('roomIdInput');
-<!--endregion-->
+//endregion
 
 let rooms = {};
 let roomRepls = {};
-let turnReady;
 let dataChannelSend, dataChannelReceive;
 
-
+/**
+ * Read–Eval–Print Loop (REPL) assigned to zombie
+ */
 function Repl(identity, formElement, inputElement, preElement){
     this.identity = identity;
     this.formElement = formElement;
