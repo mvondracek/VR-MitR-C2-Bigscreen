@@ -16,15 +16,46 @@
     <title>Man-in-the-Room Attack Proof of Concept - Bigscreen</title>
 </head>
 <body>
-<div class="container-fluid">
-    <div class="row">
-        <div class="col-12">
-            <h1>Man-in-the-Room Attack <small class="text-muted">Proof of Concept</small></h1>
-            <h2>Bigscreen <small class="text-muted"><a href="https://bigscreenvr.com/">https://bigscreenvr.com/</a></small></h2>
-            <div class="alert alert-secondary alert-dismissible fade show" role="alert">
-                <p class="h3 alert-heading">Features</p>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <a class="navbar-brand" href="#">Man-in-the-Room Attack</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav mr-auto">
+            <li class="nav-item active">
+                <a class="nav-link" href="#">Command and control panel <span class="sr-only">(current)</span></a>
+            </li>
+            <li class="nav-item"><span class="navbar-text">|</span></li>
+            <li class="nav-item">
+                <a class="nav-link" data-toggle="modal" data-target="#attacksModal" href="#">Overview of attacks</a>
+            </li>
+            <li class="nav-item"><span class="navbar-text">|</span></li>
+            <li class="nav-item">
+                <a class="nav-link" data-toggle="modal" data-target="#limitationsModal" href="#">Limitations of current implementation</a>
+            </li>
+            <li class="nav-item"><span class="navbar-text">|</span></li>
+            <li class="nav-item">
+                <a class="nav-link" data-toggle="modal" data-target="#disclaimerModal" href="#">Disclaimer</a>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+<div class="modal fade" id="attacksModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Overview of attacks</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
                 <ul>
-                    <li><b class="text-danger">Botnet-like group</b> of infected Bigscreen applications that can be controlled by this <b>Command and Control</b> panel.
+                    <li><b class="text-danger">Botnet-like group</b> of infected Bigscreen applications that can be controlled by this <b>command and control</b> panel.
                         <ul>
                             <li>
                                 Remote <abbr title="Read–Eval–Print Loop" class="initialism">REPL</abbr> (remote Javascript <code>eval</code>) on victim's machines.
@@ -47,10 +78,79 @@
                     <li>Change room's settings VR locks. <i>Only admin should be able to do this.</i></li>
                     <li>Redirect Bigscreen's <abbr title="User Interface" class="initialism">UI</abbr> to any webpage. <b class="text-danger">Phishing</b></li>
                 </ul>
-                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="limitationsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Limitations of current implementation</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
                 </button>
             </div>
+            <div class="modal-body">
+                <ul>
+                    <li>
+                        Peer connection intended for multimedia transport currently does not support fallback to TURN servers.
+                        Support for STUN servers was sufficient for this proof of concept.
+                        With support for STUN servers, we were able to connect with users across Internet without complications.
+                    </li>
+                    <li>
+                        Peer connection establishment is currently supported only with participants who are already in the room.
+                        This command and control panel does not initiate the connection, but accepts incoming connections.
+                        This was sufficient for this proof of concept
+                    </li>
+                    <li>
+                        Command and control panel currently does not support reconnecting to zombies after page refresh.
+                        Please restart relay server if you refresh this page.
+                    </li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="disclaimerModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-danger text-white">
+            <div class="modal-header">
+                <h5 class="modal-title">Disclaimer</h5>
+            </div>
+            <div class="modal-body">
+                <p class="text-justify">This software is a part of the cyber forensic research carried out by the research group
+                    UNHcFREG&nbsp;@&nbsp;TCoE at the University of New Haven, CT, USA. This software was developed
+                    as a proof of concept Man-in-the-Room attack. Details concerning the research were kept private,
+                    the software vendor (Bigscreen, Inc.) was then contacted during responsible disclosure. No harm has been done
+                    to the official infrastructure and users. Authors assume no liability and are not responsible for
+                    any misuse or damage caused by this software. This software is intended as a proof of concept only.
+                </p>
+                <p class="text-justify font-weight-bold">
+                    The end user of this software agrees to use this software for education and research purposes only.
+                </p>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Accept</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1>Man-in-the-Room Attack <small class="text-muted">Proof of Concept</small></h1>
+            <h2>Command and control panel: Bigscreen <small class="text-muted"><a href="https://bigscreenvr.com/">https://bigscreenvr.com/</a></small></h2>
         </div>
         <div class="col-12">
             <form class="form-inline justify-content-center" id="joinRoomForm">
@@ -124,6 +224,9 @@
  * WARNING: This source code was developed as proof-of-concept and is NOT production-ready!
  *
  */
+
+// show disclaimer
+$('#disclaimerModal').modal({backdrop:'static',keyboard:false});
 
 //region Configuration
 
