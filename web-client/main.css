@@ -65,3 +65,6 @@ div.zombie-logs div.card-body p {
 body {
     overflow-y: scroll;
 }
+.zombie-control-menu {
+    width:30em;
+}

