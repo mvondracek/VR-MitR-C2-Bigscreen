@@ -484,6 +484,8 @@ function RoomParticipant(identity, room, userId){
         '                       <div class="dropdown-divider"></div>\n' +
         '                       <button class="_toggleVideo dropdown-item" type="button">Toggle video</button>\n' +
         '                       <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_setAdmin dropdown-item" type="button">Grant admin privileges</button>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
         '                       <button class="_runCalc dropdown-item" type="button">Run <code>calc.exe</code></button>\n' +
         '                       <div class="dropdown-divider"></div>\n' +
         '                       <button class="_runCmd dropdown-item" type="button">Run <code>cmd.exe</code></button>\n' +
@@ -500,10 +502,6 @@ function RoomParticipant(identity, room, userId){
         '                <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#repl'+this.room.roomId+this.userId+'">' +
         '                   <b class="icon">📡</b>' +
         '                   REPL</button>\n' +
-        '                <button class="_setAdmin btn btn-secondary" type="button" >' +
-        '                   <b class="icon">👑</b>' +
-        '                   Admin' +
-        '                </button>\n' +
         '                <button class="_kick btn btn-danger" type="button" >' +
         '                   <b class="icon">👋</b>' +
         '                   Kick' +
