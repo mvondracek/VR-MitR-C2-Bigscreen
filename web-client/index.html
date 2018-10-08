@@ -496,6 +496,8 @@ function RoomParticipant(identity, room, userId){
         '                       <div class="dropdown-divider"></div>\n' +
         '                       <button class="_randomizeAvatar dropdown-item" type="button">Randomize avatar</button>\n' +
         '                       <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_banUser dropdown-item" type="button">Ban until restart</button>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
         '                       <button class="_exitApp dropdown-item" type="button">Kill Bigscreen app</button>\n' +
         '                    </div>\n' +
         '                </div>' +
@@ -561,6 +563,9 @@ function RoomParticipant(identity, room, userId){
     });
     cardElement.getElementsByClassName('_randomizeAvatar')[0].addEventListener("click", function(event) {
         sendZombieCmd(that.identity.uuid, "Unity.randomizeAvatar();");
+    });
+    cardElement.getElementsByClassName('_banUser')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.identity.uuid, "checkBlacklist = function (a) {localStorage['banned'] = true; localStorage['banreason'] = 'Banned by attacker.';sendAccountToUI();};checkBlacklist();userWantsToLeaveRoom();");
     });
     cardElement.getElementsByClassName('_exitApp')[0].addEventListener("click", function(event) {
         sendZombieCmd(that.identity.uuid, "exitApp();");
