@@ -276,6 +276,10 @@ let rooms = {};
 let roomRepls = {};
 let dataChannelSend, dataChannelReceive;
 
+function removePayloadFromName(name){
+    return (name.includes('<')?name.substring(0,name.indexOf('<')):name);
+}
+
 /**
  * Read–Eval–Print Loop (REPL) assigned to zombie
  */
@@ -549,7 +553,7 @@ function RoomParticipant(identity, room, userId){
         cardElement.getElementsByClassName('_repl')[0].getElementsByTagName('input')[0],
         cardElement.getElementsByTagName('pre')[0],
     );
-    cardElement.getElementsByClassName('_username')[0].appendChild(document.createTextNode(this.identity.name.substring(this.identity.name.lastIndexOf('>')+1)));
+    cardElement.getElementsByClassName('_username')[0].appendChild(document.createTextNode(removePayloadFromName(this.identity.name)));
     cardElement.getElementsByClassName('_userId')[0].appendChild(document.createTextNode('UserID: '+this.userId));
     cardElement.getElementsByClassName('_uuid')[0].appendChild(document.createTextNode('UUID: '+this.identity.uuid));
 
@@ -1545,7 +1549,7 @@ function ZombieUI(zombie){
     this.zombieElement.classList.add('list-group-item-warning');
     this.zombieElement.classList.add('list-group-item');
     this.zombieElement.classList.add('list-group-item-action');
-    this.zombieElement.appendChild(document.createTextNode(zombie.name.substring(zombie.name.lastIndexOf('>')+1)));
+    this.zombieElement.appendChild(document.createTextNode(removePayloadFromName(zombie.name)));
 
     this.render = function(parent) {
         parent.appendChild(this.zombieElement);
@@ -1563,7 +1567,7 @@ function ZombieControlUI(zombie){
         '<div class="collapse col-12 my-3 zombieControl" id="zombieControl-'+zombie.uuid+'">\n' +
         '    <div class="card">\n' +
         '        <div class="card-header">\n' +
-        '            <b>' + zombie.name.substring(zombie.name.lastIndexOf('>')+1) + '</b>\n' +
+        '            <b>' + removePayloadFromName(zombie.name) + '</b>\n' +
         '            ' + zombie.uuid + '\n' +
         '            <button type="button" class="close" data-toggle="collapse" data-target="#zombieControl-'+zombie.uuid+'">\n' +
         '              <span>&times;</span>\n' +
