@@ -61,7 +61,7 @@ int main() {
     printf("\n");
 
     SetConsoleTextAttribute(ConsoleOutput, FOREGROUND_RED | FOREGROUND_INTENSITY); // red text
-    printf("You could have been hacked due to security flaw in the Bigscreen Steam app.\n");
+    printf("You could have been hacked due to a security flaw in the Bigscreen Steam app.\n");
 
     getchar();
     return 0;
