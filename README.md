@@ -39,6 +39,9 @@ of concept only. The end user of this software agrees to use this software for e
 - Users: 500,000+
 - Operating Systems: Windows 7, 8.1, 10
 
+![Screenshot: control panel](/doc/screenshot.png)
+*Screenshot: control panel*
+
 ## Install
 - Run `npm install` in `.\server\ ` directory.
 - Compile selected payloads in `.\server\payloads\`. For example `cl evil.c`
