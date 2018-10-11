@@ -317,6 +317,7 @@ function generateBigscreenUuid() {
   return bigscreenRand() + bigscreenRand() + "-" + bigscreenRand() + "-" + bigscreenRand() + "-" + bigscreenRand() + "-" + bigscreenRand() + bigscreenRand() + bigscreenRand()
 }
 
+// TODO: Handle payload on different places. Was not required yet.
 function removePayloadFromName(name){
     return (name.includes('<')?name.substring(0,name.indexOf('<')):name);
 }
