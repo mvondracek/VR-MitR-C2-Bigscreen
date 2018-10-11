@@ -22,7 +22,12 @@ of concept only. The end user of this software agrees to use this software for e
 > [Tagliatela College of Engineering](https://www.newhaven.edu/engineering/)<br/>
 > [University of New Haven](https://www.newhaven.edu)
 
-> DISCLAIMER: This software is a part of the cyber forensic research carried out by the research group UNHcFREG @ TCoE at the University of New Haven, CT, USA. This software was developed as a proof of concept Man-in-the-Room attack. Details concerning the research were kept private, the software vendor (Bigscreen, Inc.) was then contacted during responsible disclosure. No harm has been done to the official infrastructure and users. Authors assume no liability and are not responsible for any misuse or damage caused by this software. This software is intended as a proof of concept only.
+> DISCLAIMER: This software is a part of the cyber forensic research carried out by the research group UNHcFREG @ TCoE
+> at the University of New Haven, CT, USA. This software was developed as a proof of concept Man-in-the-Room attack.
+> Details concerning the research were kept private, the software vendor (Bigscreen, Inc.) was then contacted during
+> responsible disclosure. No harm has been done to the official infrastructure and users. Authors assume no liability
+> and are not responsible for any misuse or damage caused by this software. This software is intended as
+> a proof of concept only.
 >
 > The end user of this software agrees to use this software for education and research purposes only.
 
@@ -35,15 +40,17 @@ of concept only. The end user of this software agrees to use this software for e
 - Operating Systems: Windows 7, 8.1, 10
 
 ## Install
-Run `npm install` in `web-client` directory.
+- Run `npm install` in `.\server\ ` directory.
+- Compile selected payloads in `.\server\payloads\`. For example `cl evil.c`
 
 ## Run
-- Run `node .\index.js ` in `web-client` directory.
+- Run `node .\index.js ` in `.\server\ ` directory.
 - Make sure `relayWebSocketServerUrl` and `webServerUrl` configuration of the Command and Control panel (`index.html`)
    corresponds to locations of the servers (`index.js`).
-- Open [http://127.0.0.1:8080/](http://127.0.0.1:8080/) in browser.
+- Open `.\control-panel\index.html` in a browser.
  
- Command and control panel (`index.html`) currently does not support reconnecting to zombies after page refresh. Please restart relay server (`index.js`) if you refresh the panel. 
+ Command and control panel (`.\control-panel\index.html`) currently does not support reconnecting to zombies after page
+ refresh. Please restart relay server (`.\server\index.js`) if you refresh the panel. 
 
 ## Overview of attacks
 Type                     | Description
