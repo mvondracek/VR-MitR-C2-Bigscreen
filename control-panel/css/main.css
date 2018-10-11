@@ -1,0 +1,90 @@
+/**
+ * Man-in-the-Room Attack and Command & Control Server Proof of Concept — Bigscreen
+ *
+ * Vondracek Martin mvondracek vondracek.mar@gmail.com
+ *
+ * Security and Forensics of Immersive Virtual Reality Social Applications
+ * Cyber Forensics Research & Education Group                 https://www.unhcfreg.com/
+ * Tagliatela College of Engineering                          https://www.newhaven.edu/engineering/
+ * University of New Haven                                    https://www.newhaven.edu
+ * 300 Boston Post Rd, West Haven, CT 06516
+ *
+ * DISCLAIMER: This software is a part of the cyber forensic research carried out by the research group UNHcFREG @ TCoE
+ * at the University of New Haven, CT, USA. This software was developed as a proof of concept Man-in-the-Room attack.
+ * Details concerning the research were kept private, the software vendor (Bigscreen, Inc.) was then contacted during
+ * responsible disclosure. No harm has been done to the official infrastructure and users. Authors assume no liability
+ * and are not responsible for any misuse or damage caused by this software. This software is intended as a proof
+ * of concept only. The end user of this software agrees to use this software for education and research purposes only.
+ */
+
+.chat {
+    height: 20em;
+    overflow-y: scroll;
+}
+.repl {
+    overflow-y: scroll;
+    resize: vertical;
+    height: 10em;
+}
+.display-inline-block {
+    display: inline-block;
+}
+.icon{
+    font-size: x-large;
+    vertical-align: sub;
+}
+.roomList,
+.zombieList {
+    height: 15em;
+    overflow-y: scroll;
+}
+.roomList-footer,
+.zombieList-footer {
+    height: 5em;
+}
+.roomId {
+    font-family: monospace;
+    font-size: 150%;
+}
+.zombie-logs div.card-body,
+.zombie-chat div.card-body
+{
+    overflow: scroll;
+    white-space: pre;
+    height: 200px;
+    resize: vertical;
+}
+.zombie-repl {
+    height: 200px;
+}
+.zombie-repl pre {
+    height: 150px;
+    margin: 0;
+    overflow-y: scroll;
+}
+.zombie-repl form div,
+.zombie-repl form div input
+{
+    height: 50px;
+}
+.collapseButton{
+    vertical-align: baseline;
+}
+div.zombie-chat div.card-body,
+div.zombie-logs div.card-body {
+    font-family: monospace;
+}
+div.zombie-chat div.card-body p,
+div.zombie-logs div.card-body p {
+    margin:0;
+}
+.zombieControl .disabled,
+#infectLobbyForm input[type=submit].disabled {
+    text-decoration: line-through;
+}
+body {
+    overflow-y: scroll;
+}
+.zombie-control-menu {
+    width:30em;
+}

