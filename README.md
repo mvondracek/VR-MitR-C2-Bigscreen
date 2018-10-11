@@ -52,7 +52,7 @@ of concept only. The end user of this software agrees to use this software for e
  Command and control panel (`.\control-panel\index.html`) currently does not support reconnecting to zombies after page
  refresh. Please restart relay server (`.\server\index.js`) if you refresh the panel. 
 
-## Overview of attacks
+## Summary of discovered exploits
 Type                     | Description
 -------------------------|------------
 **Botnet**               | Control infected Bigscreen applications from a C&C server.
