@@ -335,33 +335,33 @@ messageRelayWs.onmessage = function(event){
             if (rooms[message.roomId]) {
                 rooms[message.roomId].roomUI.renderChatMessage(message.message, message.name, date);
             }
-            if (zombiesManager.zombies[message.uuid]) {
-                zombiesManager.zombies[message.uuid].zombieControlUI.renderChatMessage(message.message, message.roomId, date);
+            if (zombiesMonitor.zombies[message.uuid]) {
+                zombiesMonitor.zombies[message.uuid].zombieControlUI.renderChatMessage(message.message, message.roomId, date);
             }
             break;
         }
         case 'log': {
-            if (zombiesManager.zombies[message.uuid]) {
-                zombiesManager.zombies[message.uuid].zombieControlUI.renderLogMessage(message.level, message.message);
+            if (zombiesMonitor.zombies[message.uuid]) {
+                zombiesMonitor.zombies[message.uuid].zombieControlUI.renderLogMessage(message.level, message.message);
             }
             break;
         }
         case 'room-discovered':
-            discoveredRoomsManager.addRoom(message.roomId);
+            discoveredRoomsMonitor.addRoom(message.roomId);
             break;
         case 'zombie-register': {
             console.log('New zombie:', message.uuid);
-            zombiesManager.addZombie(message.uuid, message.steamId, message.oculusId, message.name);
+            zombiesMonitor.addZombie(message.uuid, message.steamId, message.oculusId, message.name);
 
             let roomRepl = roomRepls[message.uuid];
-            zombiesManager.zombies[message.uuid].repls.push(roomRepl);
-            zombiesManager.zombies[message.uuid].repls.forEach(function(repl) {
+            zombiesMonitor.zombies[message.uuid].repls.push(roomRepl);
+            zombiesMonitor.zombies[message.uuid].repls.forEach(function(repl) {
                 repl.formElement.addEventListener("submit", function (event) {
                     event.preventDefault();
                     let cmd = repl.inputElement.value;
                     repl.inputElement.value = '';
                     // render cmd in all repls associated with this zombie (in zombie control and in room)
-                    zombiesManager.zombies[message.uuid].repls.forEach(
+                    zombiesMonitor.zombies[message.uuid].repls.forEach(
                         function(repl) {repl.renderCmd(cmd);}
                     );
                     sendZombieCmd(message.uuid, cmd);
@@ -371,14 +371,14 @@ messageRelayWs.onmessage = function(event){
         }
         case 'zombie-result': {
             console.log('Zombie :', message.uuid, 'Result:', message.result);
-            zombiesManager.zombies[message.uuid].repls.forEach(function(repl){
+            zombiesMonitor.zombies[message.uuid].repls.forEach(function(repl){
                 repl.renderResult(message.result);
             });
 
             break;
         }
         case 'zombie-pong': {
-            zombiesManager.receivedPong(message.uuid);
+            zombiesMonitor.receivedPong(message.uuid);
             break;
         }
         default:
@@ -1710,11 +1710,11 @@ function ZombieControlUI(zombie){
     };
 }
 
-function ZombiesManager(){
+function ZombiesMonitor(){
     let that = this;
     this.zombies = {};
 
-    this.zombieManagerUI = new ZombiesManagerUI(this);
+    this.zombiesMonitorUI = new ZombiesMonitorUI(this);
 
     this.intervalId = null;
 
@@ -1724,17 +1724,17 @@ function ZombiesManager(){
                 this.zombies[uuid].ping();
                 setTimeout(function(){
                      if(that.zombies[uuid].receivedPong){
-                         that.zombieManagerUI.updateZombie(that.zombies[uuid]);
+                         that.zombiesMonitorUI.updateZombie(that.zombies[uuid]);
                          that.zombies[uuid].zombieControlUI.enable();
                      }
                      else{
-                         that.zombieManagerUI.markZombieLost(that.zombies[uuid]);
+                         that.zombiesMonitorUI.markZombieLost(that.zombies[uuid]);
                          that.zombies[uuid].zombieControlUI.disable();
                      }
                 }, 1000);
             }
         }
-        this.zombieManagerUI.updateFooter();
+        this.zombiesMonitorUI.updateFooter();
     };
 
     this.addZombie = function(uuid, steamId, oculusId, name){
@@ -1743,7 +1743,7 @@ function ZombiesManager(){
             console.warn(`Zombie with uuid ${uuid} already exists. Will be overwritten.`);
         }
         this.zombies[uuid] = zombie;
-        this.zombieManagerUI.addZombie(zombie);
+        this.zombiesMonitorUI.addZombie(zombie);
     };
 
     this.receivedPong = function(uuid){
@@ -1760,7 +1760,7 @@ function ZombiesManager(){
             return;
         }
 
-        this.zombieManagerUI.autorefreshInput.checked = true;
+        this.zombiesMonitorUI.autorefreshInput.checked = true;
         that.update();
         this.intervalId = setInterval(function(){
             that.update();
@@ -1772,7 +1772,7 @@ function ZombiesManager(){
             return;
         }
 
-        this.zombieManagerUI.autorefreshInput.checked = false;
+        this.zombiesMonitorUI.autorefreshInput.checked = false;
         clearInterval(this.intervalId);
         this.intervalId = null;
     };
@@ -1786,10 +1786,10 @@ function ZombiesManager(){
     }
 }
 
-function ZombiesManagerUI(zombieManager){
+function ZombiesMonitorUI(zombiesMonitor){
     // TODO Maybe dynamically insert html
     let that = this;
-    this.zombieManager = zombieManager;
+    this.zombiesMonitor = zombiesMonitor;
     this.cardElement = document.getElementById('zombies');
     this.listElement = this.cardElement.querySelector('div.list-group');
     this.updatedTimeElement = this.cardElement.querySelector('.card-footer time');
@@ -1837,11 +1837,11 @@ function ZombiesManagerUI(zombieManager){
     };
 
     this.autorefreshInput.addEventListener("click", function (event) {
-        that.zombieManager.togglePeriodicUpdates();
+        that.zombiesMonitor.togglePeriodicUpdates();
     });
 }
 
-function PublicRoomsManager(){
+function PublicRoomsMonitor(){
     let that = this;
     this.sendSignalingMessage = function(message) {
         this.signalingWs.send(msgpack.encode(message));
@@ -1849,15 +1849,15 @@ function PublicRoomsManager(){
     this.onSignalingMessage = function(event){
         let message = msgpack.decode(new Uint8Array(event.data));
         if(message.type === 'room-latest'){
-            that.publicRoomsUI.hideAllRooms();
-            that.publicRoomsUI.addAllRooms(message.rooms);
+            that.publicRoomsMonitorUI.hideAllRooms();
+            that.publicRoomsMonitorUI.addAllRooms(message.rooms);
         }
         else{
-            console.warn('WARN', 'PublicRoomsManager.onSignalingMessage: Unexpected message:', message);
+            console.warn('WARN', 'PublicRoomsMonitor.onSignalingMessage: Unexpected message:', message);
         }
     };
 
-    this.publicRoomsUI = new PublicRoomsUI(this);
+    this.publicRoomsMonitorUI = new PublicRoomsMonitorUI(this);
     this.intervalId = null;
 
     this.signalingWs = new WebSocket(bigscreenSignalUrl);
@@ -1872,7 +1872,7 @@ function PublicRoomsManager(){
         that.onSignalingMessage(event);
     };
     this.signalingWs.onerror = function (event) {
-        console.error('ERROR', 'PublicRoomsManager.signalingWs.onerror', event);
+        console.error('ERROR', 'PublicRoomsMonitor.signalingWs.onerror', event);
 
     };
 
@@ -1907,10 +1907,10 @@ function PublicRoomsManager(){
     }
 }
 
-function PublicRoomsUI(publicRoomsManager){
+function PublicRoomsMonitorUI(publicRoomsMonitor){
     // TODO Maybe dynamically insert html
     let that = this;
-    this.roomsManager = publicRoomsManager;
+    this.roomsMonitor = publicRoomsMonitor;
     this.publicRoomsCardElement = document.getElementById('publicRooms');
     this.publicRoomsListElement = this.publicRoomsCardElement.getElementsByTagName('ul')[0];
     this.updatedTimeElement = this.publicRoomsCardElement.querySelector('.card-footer time');
@@ -1952,11 +1952,11 @@ function PublicRoomsUI(publicRoomsManager){
     };
 
     this.autorefreshInput.addEventListener("click", function (event) {
-        that.roomsManager.togglePeriodicUpdates();
+        that.roomsMonitor.togglePeriodicUpdates();
     });
 }
 
-function DiscoveredRoomsManager() {
+function DiscoveredRoomsMonitor() {
     let that = this;
 
     this.getRoomState = function (roomId, onSuccess, onNotFound, onError) {
@@ -1980,24 +1980,24 @@ function DiscoveredRoomsManager() {
 
     this.roomIds = [];
 
-    this.discoveredRoomsUI = new DiscoveredRoomsUI(this);
+    this.discoveredRoomsMonitorUI = new DiscoveredRoomsMonitorUI(this);
     this.intervalId = null;
 
     this.update = function(){
         this.roomIds.forEach(function(roomId){
             that.getRoomState(
                 roomId,
-                function(roomState){that.discoveredRoomsUI.updateRoom(roomState);},
-                function(){that.discoveredRoomsUI.markRoomLost(roomId);},
+                function(roomState){that.discoveredRoomsMonitorUI.updateRoom(roomState);},
+                function(){that.discoveredRoomsMonitorUI.markRoomLost(roomId);},
                 function(){console.error('Error during downloading roomstate', roomId)}
             )
         });
-        this.discoveredRoomsUI.updateFooter();
+        this.discoveredRoomsMonitorUI.updateFooter();
     };
 
     this.addRoom = function(roomId){
         if(this.roomIds.includes(roomId)){
-            console.warn('WARN', 'DiscoveredRoomsManager.addRoom()', 'RoomId is already added.');
+            console.warn('WARN', 'DiscoveredRoomsMonitor.addRoom()', 'RoomId is already added.');
             that.update();
             return;
         }
@@ -2006,8 +2006,8 @@ function DiscoveredRoomsManager() {
         }
         this.getRoomState(
             roomId,
-            function(roomState){that.discoveredRoomsUI.addRoom(roomState)},
-            function(){that.discoveredRoomsUI.addRoom({roomId:roomId})},
+            function(roomState){that.discoveredRoomsMonitorUI.addRoom(roomState)},
+            function(){that.discoveredRoomsMonitorUI.addRoom({roomId:roomId})},
             function(){console.error('Error during downloading roomstate', roomId)}
         )
     };
@@ -2018,7 +2018,7 @@ function DiscoveredRoomsManager() {
             return;
         }
 
-        this.discoveredRoomsUI.autorefreshInput.checked = true;
+        this.discoveredRoomsMonitorUI.autorefreshInput.checked = true;
         that.update();
         this.intervalId = setInterval(function(){
             that.update();
@@ -2030,7 +2030,7 @@ function DiscoveredRoomsManager() {
             return;
         }
 
-        this.discoveredRoomsUI.autorefreshInput.checked = false;
+        this.discoveredRoomsMonitorUI.autorefreshInput.checked = false;
         clearInterval(this.intervalId);
         this.intervalId = null;
     };
@@ -2044,10 +2044,10 @@ function DiscoveredRoomsManager() {
     }
 }
 
-function DiscoveredRoomsUI(discoveredRoomsManager){
+function DiscoveredRoomsMonitorUI(discoveredRoomsMonitor){
     // TODO Maybe dynamically insert html
     let that = this;
-    this.roomsManager = discoveredRoomsManager;
+    this.roomsMonitor = discoveredRoomsMonitor;
     this.cardElement = document.getElementById('discoveredRooms');
     this.listElement = this.cardElement.getElementsByTagName('ul')[0];
     this.updatedTimeElement = this.cardElement.querySelector('.card-footer time');
@@ -2117,7 +2117,7 @@ function DiscoveredRoomsUI(discoveredRoomsManager){
     };
 
     this.autorefreshInput.addEventListener("click", function (event) {
-        that.roomsManager.togglePeriodicUpdates();
+        that.roomsMonitor.togglePeriodicUpdates();
     });
 }
 
@@ -2188,7 +2188,7 @@ joinRoomForm.addEventListener("submit", function (event) {
 
     if(rooms[roomId]){console.warn('You are already connected to this room.'); return;}
 
-    discoveredRoomsManager.addRoom(roomId);
+    discoveredRoomsMonitor.addRoom(roomId);
 
     let attackerIdentity = new Identity(NAME, generateBigscreenUuid(), '', '');
     let room = new Room(roomId, attackerIdentity);
@@ -2199,11 +2199,11 @@ joinRoomForm.addEventListener("submit", function (event) {
     );
 });
 
-let publicRoomsManager = new PublicRoomsManager();
-let discoveredRoomsManager = new DiscoveredRoomsManager();
-discoveredRoomsManager.startPeriodicUpdates();
-let zombiesManager = new ZombiesManager();
-zombiesManager.startPeriodicUpdates();
+let publicRoomsMonitor = new PublicRoomsMonitor();
+let discoveredRoomsMonitor = new DiscoveredRoomsMonitor();
+discoveredRoomsMonitor.startPeriodicUpdates();
+let zombiesMonitor = new ZombiesMonitor();
+zombiesMonitor.startPeriodicUpdates();
 
 </script>
 </body>
