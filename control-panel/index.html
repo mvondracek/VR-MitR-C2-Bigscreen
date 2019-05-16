@@ -566,9 +566,9 @@ function Room(roomId, attackerIdentity){
     this.signalingWs = null;
 
     this.roomUI = null;
-    this.roomParticipants = {};
+    this.roomParticipantUIs = {};
 
-    //region Init roomParticipants
+    //region Init roomParticipantUIs
     /*
      * TODO: Change app's logic so that we could periodically update room state and participants without losing
      * connections.
@@ -595,7 +595,7 @@ function Room(roomId, attackerIdentity){
                     roomState[userId + '.uuid'],
                     roomState[userId + '.steam'] ? roomState[userId + '.steam'] : ''
                 );
-                that.roomParticipants[userId] = new RoomParticipant(identity, that, userId);
+                that.roomParticipantUIs[userId] = new RoomParticipantUI(identity, that, userId);
             }
             onSuccess();
         };
@@ -695,9 +695,9 @@ function Room(roomId, attackerIdentity){
             let roomUI = new RoomUI(roomId, that);
             roomUI.render(roomsElement);
             that.roomUI = roomUI;
-            for (let userId in that.roomParticipants){
-                if(that.roomParticipants.hasOwnProperty(userId)){
-                    that.roomParticipants[userId].render();
+            for (let userId in that.roomParticipantUIs){
+                if(that.roomParticipantUIs.hasOwnProperty(userId)){
+                    that.roomParticipantUIs[userId].render();
                 }
             }
 
@@ -726,11 +726,11 @@ function Room(roomId, attackerIdentity){
     };
 
     this.leave = function(){
-        for (let userId in this.roomParticipants){
-            if(this.roomParticipants.hasOwnProperty(userId)){
-                this.roomParticipants[userId].hide();
-                this.roomParticipants[userId].closeConnections();
-                delete this.roomParticipants[userId];
+        for (let userId in this.roomParticipantUIs){
+            if(this.roomParticipantUIs.hasOwnProperty(userId)){
+                this.roomParticipantUIs[userId].hide();
+                this.roomParticipantUIs[userId].closeConnections();
+                delete this.roomParticipantUIs[userId];
             }
         }
         this.roomUI.hide();
@@ -745,9 +745,9 @@ function Room(roomId, attackerIdentity){
 
         switch (message.type) {
             case "user-left":{
-                this.roomParticipants[message.userId].hide();
-                this.roomParticipants[message.userId].closeConnections();
-                delete this.roomParticipants[message.userId];
+                this.roomParticipantUIs[message.userId].hide();
+                this.roomParticipantUIs[message.userId].closeConnections();
+                delete this.roomParticipantUIs[message.userId];
                 console.log(`Participant ${message.userId} left room ${this.roomId}.`);
                 break;
             }
@@ -812,15 +812,15 @@ function Room(roomId, attackerIdentity){
                     candidate: message.value.slice(candidateStartPos)
                 });
                 {
-                    if( ! this.roomParticipants[message.fromUser]){
-                        console.error('ERROR', 'RoomParticipant object does not exist for sender of this received WebRTC ICE.');
+                    if( ! this.roomParticipantUIs[message.fromUser]){
+                        console.error('ERROR', 'RoomParticipantUI object does not exist for sender of this received WebRTC ICE.');
                         return;
                     }
-                    if( ! this.roomParticipants[message.fromUser].connections[message.PCID]){
+                    if( ! this.roomParticipantUIs[message.fromUser].connections[message.PCID]){
                         console.error('ERROR', 'Connection object was not found in connections of sender of this received WebRTC ICE.');
                         return;
                     }
-                    let connection = this.roomParticipants[message.fromUser].connections[message.PCID];
+                    let connection = this.roomParticipantUIs[message.fromUser].connections[message.PCID];
                     console.log('ice conn', connection);
                     connection.rtcPeerConnection.addIceCandidate(candidate);
                 }
@@ -830,13 +830,13 @@ function Room(roomId, attackerIdentity){
                 console.assert(message.fromDevice === 'desktop', message.fromDevice);
 
                 {
-                    let roomParticipant = this.roomParticipants[message.fromUser];
-                    if( ! roomParticipant){
-                        console.error('ERROR', 'RoomParticipant object does not exist for sender of this received WebRTC SDP Offer.');
+                    let roomParticipantUI = this.roomParticipantUIs[message.fromUser];
+                    if( ! roomParticipantUI){
+                        console.error('ERROR', 'RoomParticipantUI object does not exist for sender of this received WebRTC SDP Offer.');
                         return;
                     }
-                    let connection = new Connection(message.SCID, message.PCID, roomParticipant);
-                    roomParticipant.connections[message.PCID] = connection;
+                    let connection = new Connection(message.SCID, message.PCID, roomParticipantUI);
+                    roomParticipantUI.connections[message.PCID] = connection;
 
                     if (!connection.isInitiator && !connection.isStarted) {
                         connection.maybeStart();
@@ -854,15 +854,15 @@ function Room(roomId, attackerIdentity){
                 console.assert(message.fromDevice === 'desktop', message.fromDevice);
                 console.assert(message.targetDevice === 'desktop', message.targetDevice);
                 {
-                    if( ! this.roomParticipants[message.fromUser]){
-                        console.error('ERROR', 'RoomParticipant object does not exist for sender of this received WebRTC SDP Answer.');
+                    if( ! this.roomParticipantUIs[message.fromUser]){
+                        console.error('ERROR', 'RoomParticipantUI object does not exist for sender of this received WebRTC SDP Answer.');
                         return;
                     }
-                    if( ! this.roomParticipants[message.fromUser].connections[message.PCID]){
+                    if( ! this.roomParticipantUIs[message.fromUser].connections[message.PCID]){
                         console.error('ERROR', 'Connection object was not found in connections of sender of this received WebRTC SDP Answer.');
                         return;
                     }
-                    let connection = this.roomParticipants[message.fromUser].connections[message.PCID];
+                    let connection = this.roomParticipantUIs[message.fromUser].connections[message.PCID];
                     if (connection.isStarted) {
                         connection.setRemoteDescription(new RTCSessionDescription(
                             {
@@ -1064,10 +1064,10 @@ function Repl(identity, formElement, inputElement, preElement){
 /**
  *  Connection between room participants using WebRTC.
  */
-function Connection(scid, pcid, roomParticipant){
+function Connection(scid, pcid, roomParticipantUI){
     this.scid = scid;
     this.pcid = pcid;
-    this.roomParticipant = roomParticipant;
+    this.roomParticipantUI = roomParticipantUI;
 
     this.isStarted = false;
     this.isInitiator = false;
@@ -1082,15 +1082,15 @@ function Connection(scid, pcid, roomParticipant){
                 that.rtcPeerConnection.onicecandidate = function (event) {
                     console.log('icecandidate event: ', event);
                     if (event.candidate) {
-                        that.roomParticipant.room.sendSignalingMessage({
+                        that.roomParticipantUI.room.sendSignalingMessage({
                             type: 'ice',
-                            roomId: that.roomParticipant.room.roomId,
+                            roomId: that.roomParticipantUI.room.roomId,
                             value: event.candidate.sdpMLineIndex + 'bigscreen_sdp_mline_index'
                                 + event.candidate.sdpMid + 'bigscreen_sdp_mid' + event.candidate.candidate,
                             fromDevice: 'desktop',
                             targetDevice: 'desktop',
-                            fromUser: that.roomParticipant.room.attackerIdentity.userId,
-                            targetUser: that.roomParticipant.userId,
+                            fromUser: that.roomParticipantUI.room.attackerIdentity.userId,
+                            targetUser: that.roomParticipantUI.userId,
                             SCID: that.scid,
                             PCID: that.pcid,
                         });
@@ -1103,10 +1103,10 @@ function Connection(scid, pcid, roomParticipant){
                     console.log(event.streams);
                     that.remoteStream = event.streams[0];
                     if(that.pcid === 0){
-                        that.roomParticipant.videoElement.srcObject = event.streams[0];
+                        that.roomParticipantUI.videoElement.srcObject = event.streams[0];
                     }
                     else{
-                        that.roomParticipant.audioElement.srcObject = event.streams[0];
+                        that.roomParticipantUI.audioElement.srcObject = event.streams[0];
                     }
                 };
                 that.rtcPeerConnection.onremovestream = function (event) {
@@ -1166,17 +1166,17 @@ function Connection(scid, pcid, roomParticipant){
         this.rtcPeerConnection.setLocalDescription(sessionDescription);
         let sessionDescriptionMessage = {
             type: sessionDescription.type,
-            roomId: this.roomParticipant.room.roomId,
+            roomId: this.roomParticipantUI.room.roomId,
             value: sessionDescription.sdp,
             fromDevice: 'desktop',
             targetDevice: 'desktop',
-            fromUser: this.roomParticipant.room.attackerIdentity.userId,
-            targetUser: this.roomParticipant.userId,
+            fromUser: this.roomParticipantUI.room.attackerIdentity.userId,
+            targetUser: this.roomParticipantUI.userId,
             SCID: this.scid,
             PCID: this.pcid,
         };
         console.log('setLocalAndSendMessage sending message', sessionDescriptionMessage);
-        this.roomParticipant.room.sendSignalingMessage(sessionDescriptionMessage);
+        this.roomParticipantUI.room.sendSignalingMessage(sessionDescriptionMessage);
     };
 
     this.doAnswer = function() {
@@ -1207,7 +1207,7 @@ function Identity(name, uuid, steamId){
     this.userId = null;
 }
 
-function RoomParticipant(identity, room, userId){
+function RoomParticipantUI(identity, room, userId){
     let that = this;
     this.identity = identity;
     this.room = room;
