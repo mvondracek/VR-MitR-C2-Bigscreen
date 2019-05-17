@@ -44,17 +44,17 @@ of concept only. The end user of this software agrees to use this software for e
 *Screenshot: Dashboard*
 
 ## Install
-- Run `npm install` in `.\server\ ` directory.
-- Compile selected payloads in `.\server\payloads\`. For example `cl evil.c`
+- Run `npm install` in `.\relay\ ` directory.
+- Compile selected payloads in `.\relay\payloads\`. For example `cl evil.c`
 
 ## Run
-- Run `node .\index.js ` in `.\server\ ` directory.
+- Run `node .\index.js ` in `.\relay\ ` directory.
 - Make sure `relayWebSocketServerUrl` and `webServerUrl` configuration of the Command and Control Dashboard (`index.html`)
    corresponds to locations of the servers (`index.js`).
 - Open `.\dashboard\index.html` in a browser.
  
  Command and control dashboard (`.\dashboard\index.html`) currently does not support reconnecting to zombies after page
- refresh. Please restart relay server (`.\server\index.js`) if you refresh the panel. 
+ refresh. Please restart relay server (`.\relay\index.js`) if you refresh the panel. 
 
 ## Summary of discovered exploits
 Type                     | Description
