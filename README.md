@@ -40,8 +40,8 @@ of concept only. The end user of this software agrees to use this software for e
 - Operating Systems: Windows 7, 8.1, 10
 - https://bigscreenvr.com/
 
-![Screenshot: control panel](/doc/screenshot.png)
-*Screenshot: control panel*
+![Screenshot: Dashboard](/doc/screenshot.png)
+*Screenshot: Dashboard*
 
 ## Install
 - Run `npm install` in `.\server\ ` directory.
@@ -49,11 +49,11 @@ of concept only. The end user of this software agrees to use this software for e
 
 ## Run
 - Run `node .\index.js ` in `.\server\ ` directory.
-- Make sure `relayWebSocketServerUrl` and `webServerUrl` configuration of the Command and Control panel (`index.html`)
+- Make sure `relayWebSocketServerUrl` and `webServerUrl` configuration of the Command and Control Dashboard (`index.html`)
    corresponds to locations of the servers (`index.js`).
-- Open `.\control-panel\index.html` in a browser.
+- Open `.\dashboard\index.html` in a browser.
  
- Command and control panel (`.\control-panel\index.html`) currently does not support reconnecting to zombies after page
+ Command and control dashboard (`.\dashboard\index.html`) currently does not support reconnecting to zombies after page
  refresh. Please restart relay server (`.\server\index.js`) if you refresh the panel. 
 
 ## Summary of discovered exploits
@@ -87,9 +87,9 @@ Miscellaneous            | Play various sound effects from Bigscreen UI.
   STUN servers was sufficient for this proof of concept. With support for STUN servers, we were able to connect
   with users across Internet without complications.
 - Peer connection establishment is currently supported only with participants who are already in the room.
-  This command & control panel does not initiate the connection but accepts incoming connections. This was sufficient
+  This command & control dashboard does not initiate the connection but accepts incoming connections. This was sufficient
   for this proof of concept
-- Command and control panel currently does not support reconnecting to zombies after page refresh. Please restart relay
+- Command and control dashboard currently does not support reconnecting to zombies after page refresh. Please restart relay
   server if you refresh the panel.
 
 

