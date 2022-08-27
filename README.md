@@ -33,7 +33,7 @@ Our work improves the state-of-the-art in VR security and socio-technical resear
 | --- | :--- |
 
 ![Screenshot: Command & Control Server](/doc/screenshot.png)
-*Screenshot: Command & Control Server*
+*Screenshot: Command & Control Server. See [our video demonstration](https://youtu.be/N_Z3mfzLZME) for more details.*
 
 
 ## About Bigscreen, Inc.
