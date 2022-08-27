@@ -22,14 +22,18 @@ of concept only. The end user of this software agrees to use this software for e
 > [Tagliatela College of Engineering](https://www.newhaven.edu/engineering/)<br/>
 > [University of New Haven](https://www.newhaven.edu)
 
-> DISCLAIMER: This software is a part of the cyber forensic research carried out by the research group UNHcFREG @ TCoE
-> at the University of New Haven, CT, USA. This software was developed as a proof of concept Man-in-the-Room attack.
-> Details concerning the research were kept private, the software vendor (Bigscreen, Inc.) was then contacted during
-> responsible disclosure. No harm has been done to the official infrastructure and users. Authors assume no liability
-> and are not responsible for any misuse or damage caused by this software. This software is intended as
-> a proof of concept only.
->
-> The end user of this software agrees to use this software for education and research purposes only.
+Our team of researchers (Martin Vondráček, Peter Casey, Ibrahim Baggili) at the University of New Haven discovered that [Bigscreen](https://www.bigscreenvr.com/), a well-known and popular virtual reality (VR) application, and [Unity](https://unity.com), the game development platform BigScreen is built on, were vulnerable to hackers. Bigscreen, which describes itself as a "virtual living room", enables users to watch movies, collaborate on projects together and more. Our findings were **responsibly disclosed** to Bigscreen Inc. and Unity Technologies, see [our research paper](#publication) for details.
+
+The allure of the metaverse along with VR technologies and speed at which they are deployed may shift focus away from security and privacy fundamentals. In this work we employ classic exploitation techniques against cutting edge devices to obtain equally novel results. The unique features of the virtual reality landscape set the stage for our **primary account of a new attack, the Man-in-the-Room (MitR)**. This attack, realized from a vulnerable social networking application led to both **worming and botnet capabilities** being adapted for VR with potential **critical impacts affecting millions of users**.
+Our work improves the state-of-the-art in VR security and socio-technical research in VR. It shares several **analytical and attacking tools, example exploits, evaluation dataset, and vulnerability signatures** with the scientific and professional communities to **ensure secure VR software development**. The presented results demonstrate the detection and prevention of VR vulnerabilities, and raise questions in the law and policy domains pertaining to VR security and privacy.
+
+**Please see [our video demonstration](https://youtu.be/N_Z3mfzLZME) and [our research paper](#publication) for more details.**
+
+| ⚠️**DISCLAIMER:** | This software is a part of the cyber forensic research carried out by the research group [UNHcFREG](https://www.unhcfreg.com/)@[TCoE](https://www.newhaven.edu/engineering/) at the [University of New Haven, CT, USA](https://www.newhaven.edu). This software was developed as a proof of concept Man-in-the-Room attack. Details concerning the research were kept private, the software vendor (Bigscreen, Inc.) was then contacted during responsible disclosure. No harm has been done to the official infrastructure and users. Authors assume no liability and are not responsible for any misuse or damage caused by this software. This software is intended as a proof of concept only.<br/><br/>The end user of this software agrees to use this software for education and research purposes only. |
+| --- | :--- |
+
+
+
 
 ## About Bigscreen, Inc.
 - Founding Date: November 2014
