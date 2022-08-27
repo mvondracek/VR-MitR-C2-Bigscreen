@@ -32,7 +32,8 @@ Our work improves the state-of-the-art in VR security and socio-technical resear
 | ⚠️**DISCLAIMER:** | This software is a part of the cyber forensic research carried out by the research group [UNHcFREG](https://www.unhcfreg.com/)@[TCoE](https://www.newhaven.edu/engineering/) at the [University of New Haven, CT, USA](https://www.newhaven.edu). This software was developed as a proof of concept Man-in-the-Room attack. Details concerning the research were kept private, the software vendor (Bigscreen, Inc.) was then contacted during responsible disclosure. No harm has been done to the official infrastructure and users. Authors assume no liability and are not responsible for any misuse or damage caused by this software. This software is intended as a proof of concept only.<br/><br/>The end user of this software agrees to use this software for education and research purposes only. |
 | --- | :--- |
 
-
+![Screenshot: Command & Control Server](/doc/screenshot.png)
+*Screenshot: Command & Control Server*
 
 
 ## About Bigscreen, Inc.
@@ -44,8 +45,6 @@ Our work improves the state-of-the-art in VR security and socio-technical resear
 - Operating Systems: Windows 7, 8.1, 10
 - https://bigscreenvr.com/
 
-![Screenshot: Dashboard](/doc/screenshot.png)
-*Screenshot: Dashboard*
 
 ## Install
 - Run `npm install` in `.\relay\ ` directory.
