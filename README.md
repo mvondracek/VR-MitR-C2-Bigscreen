@@ -98,11 +98,31 @@ Miscellaneous            | Play various sound effects from Bigscreen UI.
 
 ## Publication
 
-This software was developed during research on ***TBA***.
-Please see the paper for more details.
+This software was developed during research on
+[Rise of the Metaverse's Immersive Virtual Reality Malware and the Man-in-the-Room Attack & Defenses](https://www.sciencedirect.com/science/article/pii/S0167404822003157).
+Please see the paper for more details and use following citation.
+
+~~~BibTeX
+@article{Vondracek-2023-102923,
+    title = {Rise of the Metaverse’s Immersive Virtual Reality Malware and the Man-in-the-Room Attack & Defenses},
+    journal = {Computers \& Security},
+    volume = {127},
+    pages = {102923},
+    year = {2023},
+    issn = {0167-4048},
+    doi = {https://doi.org/10.1016/j.cose.2022.102923},
+    url = {https://www.sciencedirect.com/science/article/pii/S0167404822003157},
+    author = {Martin Vondráček and Ibrahim Baggili and Peter Casey and Mehdi Mekni}
+}
+~~~
 
 
-# Links
+## Links
 
 - [UNHcFREG, *BigScreen and Unity Virtual Reality Attacks and the Man in The Room Attack*](https://www.unhcfreg.com/single-post/2019/02/19/bigscreen-and-unity-virtual-reality-attacks)
 - [University of New Haven, *University of New Haven Researchers Discover Critical Vulnerabilities in Popular Virtual Reality Application*](https://www.newhaven.edu/news/releases/2019/discover-vulnerabilities-virtual-reality-app.php)
+- Martin Vondráček, Ibrahim Baggili, Peter Casey, and Mehdi Mekni.
+  *Rise of the Metaverse's Immersive Virtual Reality Malware and
+  the Man-in-the-Room Attack & Defenses*. Computers \& Security.
+  vol. 127. p. 102923. 2023. Online.
+  https://www.sciencedirect.com/science/article/pii/S0167404822003157
